@@ -79,6 +79,15 @@ let originalCameraPosition = new THREE.Vector3();
 let originalControlsTarget = new THREE.Vector3();
 let isGravityActive = false;
 
+// Jin Mode variables
+let jinParticles = [];
+let isJinModeActive = false;
+
+// Hozi Mode variables
+let isHoziModeActive = false;
+let hexagonEyes = [];
+let floatingEyes = [];
+
 // Control parameters
 let rotationSpeed = 0.005;
 let fragmentSpeed = 0.4;
@@ -297,12 +306,11 @@ function explodeHexagon() {
     
     isExploded = true;
     
-    // Update button states
-    const breakButton = document.getElementById('breakHologram');
-    const gravityButton = document.getElementById('gravityPull');
-    breakButton.disabled = true;
-    breakButton.textContent = 'Hologram Broken';
-    gravityButton.disabled = false; // Enable gravity button
+    // Clean up Hozi mode if active
+    if (isHoziModeActive) {
+        removeFloatingEyes();
+        isHoziModeActive = false;
+    }
     
     // Create fragments at hexagon position FIRST
     createFragments();
@@ -353,6 +361,13 @@ function explodeHexagon() {
     };
     
     animate();
+
+    // Update button states
+    const breakButton = document.getElementById('breakHologram');
+    const gravityButton = document.getElementById('gravityPull');
+    breakButton.disabled = true;
+    breakButton.textContent = 'Hologram Broken';
+    gravityButton.disabled = false; // Enable gravity button
 }
 
 function focusOnFragment(fragment) {
@@ -411,6 +426,20 @@ function resetScene() {
     focusedFragment = null;
     isGravityActive = false;
     
+    // Clean up special modes
+    if (isJinModeActive) {
+        cleanupJinParticles();
+        isJinModeActive = false;
+    }
+    
+    if (isHoziModeActive) {
+        removeFloatingEyes();
+        isHoziModeActive = false;
+    }
+    
+    // Hide Hozi button
+    hideHoziButton();
+    
     // Update button states
     const breakButton = document.getElementById('breakHologram');
     const gravityButton = document.getElementById('gravityPull');
@@ -436,6 +465,9 @@ function resetScene() {
     
     // Hide element info
     hideElementInfo();
+    
+    // Show Hozi button since hexagon is now complete
+    showHoziButton();
 }
 
 function toggleControls() {
@@ -522,6 +554,10 @@ function addEventListeners() {
     });
     
     document.getElementById('resetScene').addEventListener('click', resetScene);
+    
+    // Jin Mode and Hozi Mode event listeners
+    document.getElementById('jinMode').addEventListener('click', activateJinMode);
+    document.getElementById('hoziMode').addEventListener('click', activateHoziMode);
     
     // Window resize
     window.addEventListener('resize', onWindowResize);
@@ -701,6 +737,37 @@ function animate() {
         }
     });
     
+    // Animate Jin Mode particles
+    if (isJinModeActive && jinParticles.length > 0) {
+        jinParticles.forEach(particle => {
+            // Apply velocity
+            particle.position.add(particle.userData.velocity);
+            
+            // Apply rotation
+            particle.rotation.x += particle.userData.rotationVelocity.x;
+            particle.rotation.y += particle.userData.rotationVelocity.y;
+            particle.rotation.z += particle.userData.rotationVelocity.z;
+            
+            // Bounce off boundaries (same as fragments)
+            const boundary = 12;
+            if (Math.abs(particle.position.x) > boundary) {
+                particle.userData.velocity.x *= -0.7;
+                particle.position.x = Math.sign(particle.position.x) * boundary;
+            }
+            if (Math.abs(particle.position.y) > boundary) {
+                particle.userData.velocity.y *= -0.7;
+                particle.position.y = Math.sign(particle.position.y) * boundary;
+            }
+            if (Math.abs(particle.position.z) > boundary) {
+                particle.userData.velocity.z *= -0.7;
+                particle.position.z = Math.sign(particle.position.z) * boundary;
+            }
+            
+            // Apply slight damping
+            particle.userData.velocity.multiplyScalar(0.997);
+        });
+    }
+    
     // Update info panel position if focused on fragment
     if (focusedFragment) {
         showElementInfoAtPosition(focusedFragment.userData.element, focusedFragment);
@@ -818,6 +885,107 @@ function reformHexagon() {
     };
     
     reformAnimation();
+}
+
+function activateJinMode() {
+    if (isJinModeActive) return;
+    
+    isJinModeActive = true;
+    
+    // Create 1000 particles
+    for (let i = 0; i < 1000; i++) {
+        const geometry = new THREE.SphereGeometry(0.02 + Math.random() * 0.05, 6, 6);
+        
+        // Random bright colors
+        const colors = [0xff6b6b, 0xffd93d, 0x4ecdc4, 0x45b7d1, 0xf9ca24, 0xf0932b, 0xeb4d4b, 0x6c5ce7];
+        const color = colors[Math.floor(Math.random() * colors.length)];
+        
+        const material = new THREE.MeshBasicMaterial({
+            color: color,
+            transparent: true,
+            opacity: 0.8
+        });
+        
+        const particle = new THREE.Mesh(geometry, material);
+        
+        // Start particles at center
+        particle.position.set(0, 0, 0);
+        
+        // Random explosion velocity (smaller for floating effect)
+        const explosionForce = 0.1 + Math.random() * 0.2;
+        const angle1 = Math.random() * Math.PI * 2;
+        const angle2 = Math.random() * Math.PI * 2;
+        
+        particle.userData = {
+            velocity: new THREE.Vector3(
+                Math.cos(angle1) * Math.sin(angle2) * explosionForce,
+                Math.sin(angle1) * Math.sin(angle2) * explosionForce,
+                Math.cos(angle2) * explosionForce
+            ),
+            rotationVelocity: new THREE.Vector3(
+                (Math.random() - 0.5) * 0.02,
+                (Math.random() - 0.5) * 0.02,
+                (Math.random() - 0.5) * 0.02
+            )
+        };
+        
+        jinParticles.push(particle);
+        scene.add(particle);
+    }
+}
+
+function cleanupJinParticles() {
+    jinParticles.forEach(particle => {
+        scene.remove(particle);
+    });
+    jinParticles = [];
+}
+
+function showHoziButton() {
+    const hoziButton = document.getElementById('hoziMode');
+    hoziButton.style.display = 'block';
+}
+
+function hideHoziButton() {
+    const hoziButton = document.getElementById('hoziMode');
+    hoziButton.style.display = 'none';
+}
+
+function activateHoziMode() {
+    if (isHoziModeActive) return;
+    
+    isHoziModeActive = true;
+    
+    // Add 3 floating eye emojis to the screen
+    for (let i = 0; i < 3; i++) {
+        const eyeDiv = document.createElement('div');
+        eyeDiv.className = 'floating-eye';
+        eyeDiv.textContent = '👁️';
+        
+        // Random positions on screen
+        const x = 20 + Math.random() * (window.innerWidth - 100);
+        const y = 20 + Math.random() * (window.innerHeight - 100);
+        
+        eyeDiv.style.left = x + 'px';
+        eyeDiv.style.top = y + 'px';
+        eyeDiv.style.animationDelay = (i * 0.5) + 's';
+        
+        document.body.appendChild(eyeDiv);
+        floatingEyes.push(eyeDiv);
+    }
+    
+    // Remove eyes after 10 seconds
+    setTimeout(() => {
+        removeFloatingEyes();
+        isHoziModeActive = false;
+    }, 10000);
+}
+
+function removeFloatingEyes() {
+    floatingEyes.forEach(eye => {
+        document.body.removeChild(eye);
+    });
+    floatingEyes = [];
 }
 
 // Initialize when page loads
