@@ -23,9 +23,9 @@
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "https://github.com/yourusername/chemistry-elements-3d.git"
+    "url": "https://github.com/ssttuuddiioo/chemistry-hologram.git"
   },
-  "homepage": "https://your-app-name.netlify.app",
+  "homepage": "https://chemistry-hologram.netlify.app",
   "devDependencies": {},
   "dependencies": {},
   "engines": {
