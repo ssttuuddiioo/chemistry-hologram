@@ -77,6 +77,7 @@ let animationId;
 let focusedFragment = null;
 let originalCameraPosition = new THREE.Vector3();
 let originalControlsTarget = new THREE.Vector3();
+let isGravityActive = false;
 
 // Control parameters
 let rotationSpeed = 0.005;
@@ -292,10 +293,12 @@ function explodeHexagon() {
     
     isExploded = true;
     
-    // Update button state
+    // Update button states
     const breakButton = document.getElementById('breakHologram');
+    const gravityButton = document.getElementById('gravityPull');
     breakButton.disabled = true;
     breakButton.textContent = 'Hologram Broken';
+    gravityButton.disabled = false; // Enable gravity button
     
     // Create fragments at hexagon position FIRST
     createFragments();
@@ -402,11 +405,15 @@ function returnToOverview() {
 function resetScene() {
     isExploded = false;
     focusedFragment = null;
+    isGravityActive = false;
     
-    // Update button state
+    // Update button states
     const breakButton = document.getElementById('breakHologram');
+    const gravityButton = document.getElementById('gravityPull');
     breakButton.disabled = false;
     breakButton.textContent = 'Break Hologram';
+    gravityButton.disabled = true;
+    gravityButton.textContent = 'Gravity Pull';
     
     // Remove fragments
     fragments.forEach(fragment => {
@@ -498,6 +505,12 @@ function addEventListeners() {
     document.getElementById('breakHologram').addEventListener('click', () => {
         if (!isExploded) {
             explodeHexagon();
+        }
+    });
+    
+    document.getElementById('gravityPull').addEventListener('click', () => {
+        if (isExploded && !isGravityActive) {
+            gravityPull();
         }
     });
     
@@ -658,6 +671,113 @@ function animate() {
     
     // Render
     renderer.render(scene, camera);
+}
+
+function gravityPull() {
+    if (!isExploded || isGravityActive) return;
+    
+    isGravityActive = true;
+    
+    // Update button states
+    const gravityButton = document.getElementById('gravityPull');
+    const breakButton = document.getElementById('breakHologram');
+    gravityButton.disabled = true;
+    gravityButton.textContent = 'Gravity Active';
+    
+    // Return to overview if focused on a fragment
+    if (focusedFragment) {
+        returnToOverview();
+    }
+    
+    // Animate fragments back to center
+    fragments.forEach((fragment, index) => {
+        // Calculate attraction force towards center
+        const attractionStrength = 0.05;
+        
+        // Set up gravity animation
+        const animateToCenter = () => {
+            if (!isGravityActive) return;
+            
+            // Calculate direction to center
+            const directionToCenter = new THREE.Vector3(0, 0, 0).sub(fragment.position);
+            const distance = directionToCenter.length();
+            
+            if (distance > 0.1) {
+                // Apply gravity force
+                directionToCenter.normalize();
+                fragment.userData.velocity.add(directionToCenter.multiplyScalar(attractionStrength));
+                
+                // Apply some damping to prevent overshoot
+                fragment.userData.velocity.multiplyScalar(0.95);
+                
+                // Update position
+                fragment.position.add(fragment.userData.velocity);
+                
+                // Slow down rotation as fragments approach center
+                fragment.userData.rotationVelocity.multiplyScalar(0.98);
+                
+                // Scale down fragments as they approach center
+                const scaleTarget = Math.max(0.1, distance / 10);
+                fragment.scale.multiplyScalar(0.99);
+                
+                requestAnimationFrame(animateToCenter);
+            } else {
+                // Fragment has reached center, make it disappear
+                fragment.visible = false;
+                
+                // Check if all fragments are at center
+                const allAtCenter = fragments.every(frag => !frag.visible || frag.position.length() < 0.1);
+                if (allAtCenter) {
+                    reformHexagon();
+                }
+            }
+        };
+        
+        // Start animation with slight delay for staggered effect
+        setTimeout(() => {
+            animateToCenter();
+        }, index * 100);
+    });
+}
+
+function reformHexagon() {
+    // Make hexagon visible and animate it growing back
+    hexagon.visible = true;
+    hexagon.scale.set(0.1, 0.1, 0.1);
+    hexagon.material.opacity = 0.1;
+    
+    const reformAnimation = () => {
+        if (hexagon.scale.x < 1.0) {
+            hexagon.scale.multiplyScalar(1.08);
+            hexagon.material.opacity += 0.05;
+            requestAnimationFrame(reformAnimation);
+        } else {
+            // Reset everything to normal state
+            hexagon.scale.set(1, 1, 1);
+            hexagon.material.opacity = 0.8;
+            
+            // Clean up fragments
+            fragments.forEach(fragment => {
+                scene.remove(fragment);
+            });
+            fragments = [];
+            
+            // Reset states
+            isExploded = false;
+            isGravityActive = false;
+            
+            // Update button states
+            const gravityButton = document.getElementById('gravityPull');
+            const breakButton = document.getElementById('breakHologram');
+            
+            gravityButton.disabled = true;
+            gravityButton.textContent = 'Gravity Pull';
+            breakButton.disabled = false;
+            breakButton.textContent = 'Break Hologram';
+        }
+    };
+    
+    reformAnimation();
 }
 
 // Initialize when page loads
