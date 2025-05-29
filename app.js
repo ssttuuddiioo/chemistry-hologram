@@ -283,6 +283,11 @@ function explodeHexagon() {
     
     isExploded = true;
     
+    // Update button state
+    const breakButton = document.getElementById('breakHologram');
+    breakButton.disabled = true;
+    breakButton.textContent = 'Hologram Broken';
+    
     // Hide hexagon with animation
     const hexagonTween = {
         scale: { x: 1, y: 1, z: 1 },
@@ -363,6 +368,11 @@ function returnToOverview() {
 function resetScene() {
     isExploded = false;
     focusedFragment = null;
+    
+    // Update button state
+    const breakButton = document.getElementById('breakHologram');
+    breakButton.disabled = false;
+    breakButton.textContent = 'Break Hologram';
     
     // Remove fragments
     fragments.forEach(fragment => {
@@ -449,6 +459,12 @@ function addEventListeners() {
     document.getElementById('wireframeMode').addEventListener('change', (e) => {
         wireframeMode = e.target.checked;
         updateWireframeMode();
+    });
+    
+    document.getElementById('breakHologram').addEventListener('click', () => {
+        if (!isExploded) {
+            explodeHexagon();
+        }
     });
     
     document.getElementById('resetScene').addEventListener('click', resetScene);
