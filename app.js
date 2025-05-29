@@ -228,14 +228,11 @@ function createFragments() {
         fragment.castShadow = true;
         fragment.receiveShadow = true;
         
-        // Position fragments in a more dynamic spread
-        const angle = (i / numElements) * Math.PI * 2;
-        const radius = 4 + Math.random() * 2;
-        fragment.position.set(
-            Math.cos(angle) * radius,
-            Math.sin(angle) * radius,
-            (Math.random() - 0.5) * 3
-        );
+        // START fragments at hexagon center position (0, 0, 0)
+        fragment.position.set(0, 0, 0);
+        
+        // Start fragments smaller and scale them up as they explode
+        fragment.scale.set(0.3, 0.3, 0.3);
 
         // Add random rotation
         fragment.rotation.set(
@@ -244,22 +241,23 @@ function createFragments() {
             Math.random() * Math.PI
         );
 
-        // Store velocity for animation
+        // Store target positions for reference
+        const angle = (i / numElements) * Math.PI * 2;
+        const radius = 4 + Math.random() * 2;
+        
+        // Store velocity for animation (will be set during explosion)
         fragment.userData = {
             clickable: true,
             type: 'fragment',
             element: element,
-            originalPosition: fragment.position.clone(),
-            velocity: new THREE.Vector3(
-                (Math.random() - 0.5) * 0.03 * fragmentSpeed,
-                (Math.random() - 0.5) * 0.03 * fragmentSpeed,
-                (Math.random() - 0.5) * 0.03 * fragmentSpeed
+            targetPosition: new THREE.Vector3(
+                Math.cos(angle) * radius,
+                Math.sin(angle) * radius,
+                (Math.random() - 0.5) * 3
             ),
-            rotationVelocity: new THREE.Vector3(
-                (Math.random() - 0.5) * 0.02,
-                (Math.random() - 0.5) * 0.02,
-                (Math.random() - 0.5) * 0.02
-            )
+            velocity: new THREE.Vector3(0, 0, 0), // Start with no velocity
+            rotationVelocity: new THREE.Vector3(0, 0, 0), // Start with no rotation
+            explosionStartTime: Date.now()
         };
 
         fragments.push(fragment);
@@ -275,6 +273,17 @@ function createFragments() {
         });
         const wireframeFragment = new THREE.Mesh(wireframeGeometry, wireframeMaterial);
         fragment.add(wireframeFragment);
+        
+        // Animate fragment scale from small to normal
+        setTimeout(() => {
+            const scaleAnimation = () => {
+                if (fragment.scale.x < 1.0) {
+                    fragment.scale.multiplyScalar(1.05);
+                    requestAnimationFrame(scaleAnimation);
+                }
+            };
+            scaleAnimation();
+        }, i * 50); // Stagger the scale animations
     }
 }
 
@@ -288,17 +297,43 @@ function explodeHexagon() {
     breakButton.disabled = true;
     breakButton.textContent = 'Hologram Broken';
     
-    // Hide hexagon with animation
+    // Create fragments at hexagon position FIRST
+    createFragments();
+    
+    // Start hexagon break animation AND fragment explosion simultaneously
     const hexagonTween = {
         scale: { x: 1, y: 1, z: 1 },
         opacity: 0.8
     };
     
+    // Start fragment explosion immediately
+    setTimeout(() => {
+        fragments.forEach((fragment, index) => {
+            // Calculate explosion direction from center
+            const angle = (index / fragments.length) * Math.PI * 2;
+            const explosionForce = 0.15 + Math.random() * 0.1;
+            
+            // Set explosion velocities
+            fragment.userData.velocity.set(
+                Math.cos(angle) * explosionForce,
+                Math.sin(angle) * explosionForce,
+                (Math.random() - 0.5) * 0.1
+            );
+            
+            // Add some random rotation velocity for more dynamic effect
+            fragment.userData.rotationVelocity.set(
+                (Math.random() - 0.5) * 0.05,
+                (Math.random() - 0.5) * 0.05,
+                (Math.random() - 0.5) * 0.05
+            );
+        });
+    }, 100); // Small delay to let fragments appear first
+    
     const animate = () => {
-        hexagonTween.scale.x *= 0.92;
-        hexagonTween.scale.y *= 0.92;
-        hexagonTween.scale.z *= 0.92;
-        hexagonTween.opacity *= 0.92;
+        hexagonTween.scale.x *= 0.88;
+        hexagonTween.scale.y *= 0.88;
+        hexagonTween.scale.z *= 0.88;
+        hexagonTween.opacity *= 0.85;
         
         hexagon.scale.set(hexagonTween.scale.x, hexagonTween.scale.y, hexagonTween.scale.z);
         hexagon.material.opacity = hexagonTween.opacity;
@@ -307,7 +342,6 @@ function explodeHexagon() {
             requestAnimationFrame(animate);
         } else {
             hexagon.visible = false;
-            createFragments();
         }
     };
     
