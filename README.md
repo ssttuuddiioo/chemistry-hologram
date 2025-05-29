@@ -1,6 +1,45 @@
-# Chemistry Elements - Interactive 3D Experience
+# Chemistry Hologram 🧪✨
 
-An interactive Three.js application featuring a breakable hexagon that represents various chemistry elements and services. Click the hexagon to break it into floating, clickable pieces that showcase different aspects of chemistry and technology.
+Interactive 3D chemistry elements experience built with Three.js
+
+## 🚀 Live Demo
+[View Live Site](https://chemistry-hologram.netlify.app)
+
+## 🛠️ Development
+```bash
+git clone https://github.com/ssttuuddiioo/chemistry-hologram.git
+cd chemistry-hologram
+open index.html
+```
+
+## 📱 Features
+- Interactive 3D hexagon that breaks into chemistry elements
+- Camera zoom-to-fragment functionality  
+- Wireframe + fill rendering with white overlays
+- Real-time parameter controls (hideable)
+- Keyboard shortcuts (1-9, R, ESC, H)
+- Physics simulation with boundary collision
+- Blue/yellow tech aesthetic
+- Auto-deployment via Netlify
+
+## 🎮 Controls
+- **Click hexagon** to break into pieces
+- **Click fragments** for detailed information
+- **Mouse drag** to rotate camera
+- **Scroll** to zoom in/out
+- **1-9 keys** for quick element access
+- **R** to reset scene
+- **ESC** to return to overview
+- **H** to hide/show controls
+
+## 🔧 Tech Stack
+- Three.js for 3D graphics
+- Vanilla JavaScript ES6+
+- CSS3 with glassmorphism effects
+- Netlify for deployment
+- GitHub for version control
+
+Built with ❤️ for interactive chemistry education
 
 ## Features
 
