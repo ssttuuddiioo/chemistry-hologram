@@ -81,7 +81,7 @@ let isGravityActive = false;
 
 // Control parameters
 let rotationSpeed = 0.005;
-let fragmentSpeed = 1;
+let fragmentSpeed = 0.4;
 let hexagonColor = 0x4a4aff;
 let lightIntensity = 1;
 let wireframeMode = true;
@@ -156,8 +156,8 @@ function createLights() {
 }
 
 function createHexagon() {
-    // 50% more extruded hexagon (1.5 * 1.5 = 2.25)
-    const geometry = new THREE.CylinderGeometry(2.5, 2.5, 2.25, 6);
+    // 50% more extruded hexagon (2.25 * 1.5 = 3.375)
+    const geometry = new THREE.CylinderGeometry(2.5, 2.5, 3.375, 6);
     const material = new THREE.MeshPhongMaterial({ 
         color: hexagonColor,
         shininess: 100,
@@ -170,10 +170,14 @@ function createHexagon() {
     hexagon.castShadow = true;
     hexagon.receiveShadow = true;
     hexagon.userData = { clickable: true, type: 'hexagon' };
+    
+    // Rotate hexagon to face front (90 degrees on X axis)
+    hexagon.rotation.x = Math.PI / 2;
+    
     scene.add(hexagon);
 
     // Add white wireframe outline
-    const wireframeGeometry = new THREE.CylinderGeometry(2.5, 2.5, 2.25, 6);
+    const wireframeGeometry = new THREE.CylinderGeometry(2.5, 2.5, 3.375, 6);
     const wireframeMaterial = new THREE.MeshBasicMaterial({
         color: 0xffffff,
         wireframe: true,
@@ -425,7 +429,7 @@ function resetScene() {
     hexagon.visible = true;
     hexagon.scale.set(1, 1, 1);
     hexagon.material.opacity = 0.8;
-    hexagon.rotation.set(0, 0, 0);
+    hexagon.rotation.set(Math.PI / 2, 0, 0); // Maintain front-facing rotation
     
     // Reset camera
     returnToOverview();
@@ -453,6 +457,9 @@ function toggleControls() {
 function addEventListeners() {
     // Mouse events
     renderer.domElement.addEventListener('click', onMouseClick);
+    
+    // Touch events for mobile
+    renderer.domElement.addEventListener('touchend', onTouchEnd, { passive: false });
     
     // Keyboard events
     document.addEventListener('keydown', onKeyDown);
@@ -537,6 +544,39 @@ function updateWireframeMode() {
 function onMouseClick(event) {
     mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
     mouse.y = -(event.clientY / window.innerHeight) * 2 + 1;
+
+    raycaster.setFromCamera(mouse, camera);
+    
+    const clickableObjects = [hexagon, ...fragments].filter(obj => obj.visible && obj.userData.clickable);
+    const intersects = raycaster.intersectObjects(clickableObjects);
+
+    if (intersects.length > 0) {
+        const clicked = intersects[0].object;
+        
+        if (clicked.userData.type === 'hexagon') {
+            explodeHexagon();
+        } else if (clicked.userData.type === 'fragment') {
+            focusOnFragment(clicked);
+        }
+    }
+}
+
+function onTouchEnd(event) {
+    event.preventDefault();
+    
+    // Only handle single touch
+    if (event.changedTouches.length !== 1) return;
+    
+    const touch = event.changedTouches[0];
+    
+    // Calculate touch position relative to canvas
+    const rect = renderer.domElement.getBoundingClientRect();
+    const x = touch.clientX - rect.left;
+    const y = touch.clientY - rect.top;
+    
+    // Convert to normalized device coordinates
+    mouse.x = (x / renderer.domElement.clientWidth) * 2 - 1;
+    mouse.y = -(y / renderer.domElement.clientHeight) * 2 + 1;
 
     raycaster.setFromCamera(mouse, camera);
     
