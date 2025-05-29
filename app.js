@@ -1,3 +1,6 @@
+console.log('app.js is loading...');
+console.log('THREE available:', typeof THREE !== 'undefined');
+
 // Chemistry Elements Data with updated colors
 const chemistryElements = [
     { 
@@ -98,70 +101,108 @@ let controlsVisible = true;
 
 // Initialize the scene
 function init() {
-    // Create scene
-    scene = new THREE.Scene();
-    scene.fog = new THREE.Fog(0xffffff, 15, 80);
+    console.log('Initializing scene...');
+    
+    try {
+        // Create scene
+        scene = new THREE.Scene();
+        scene.fog = new THREE.Fog(0xffffff, 15, 80);
+        console.log('Scene created');
 
-    // Create camera
-    camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
-    camera.position.set(0, 0, 12);
-    originalCameraPosition.copy(camera.position);
+        // Create camera - positioned straight-on to look into display box
+        camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
+        
+        // Set camera position to look straight into the box (no rotation, no movement)
+        const cameraDistance = 15;
+        camera.position.set(0, 0, cameraDistance); // Centered, straight-on view
+        camera.lookAt(0, 0, 0); // Look at the center of the display box
+        originalCameraPosition.copy(camera.position);
+        console.log('Camera positioned for fixed straight-on view');
 
-    // Create renderer
-    renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
-    renderer.setSize(window.innerWidth, window.innerHeight);
-    renderer.setClearColor(0xffffff, 0);
-    renderer.shadowMap.enabled = true;
-    renderer.shadowMap.type = THREE.PCFSoftShadowMap;
-    document.getElementById('container').appendChild(renderer.domElement);
+        // Create renderer
+        renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        renderer.setClearColor(0xffffff, 0);
+        renderer.shadowMap.enabled = true;
+        renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+        
+        const container = document.getElementById('container');
+        console.log('Container element:', container);
+        if (!container) {
+            throw new Error('Container element not found!');
+        }
+        
+        container.appendChild(renderer.domElement);
+        console.log('Renderer created and added to DOM');
 
-    // Create controls
-    controls = new THREE.OrbitControls(camera, renderer.domElement);
-    controls.enableDamping = true;
-    controls.dampingFactor = 0.05;
-    controls.enablePan = false;
-    controls.minDistance = 3;
-    controls.maxDistance = 25;
-    originalControlsTarget.copy(controls.target);
+        // Camera stays completely locked - no controls or movement
+        console.log('Camera locked in fixed position');
 
-    // Create lights
-    createLights();
+        // Create lights
+        createLights();
+        console.log('Lights created');
 
-    // Create hexagon
-    createHexagon();
+        // Create hexagon
+        createHexagon();
+        console.log('Hexagon created');
 
-    // Initialize raycaster and mouse
-    raycaster = new THREE.Raycaster();
-    mouse = new THREE.Vector2();
+        // Initialize raycaster and mouse
+        raycaster = new THREE.Raycaster();
+        mouse = new THREE.Vector2();
+        console.log('Raycaster and mouse initialized');
 
-    // Add event listeners
-    addEventListeners();
+        // Add event listeners
+        addEventListeners();
+        console.log('Event listeners added');
 
-    // Start animation loop
-    animate();
+        // Start animation loop
+        animate();
+        console.log('Animation loop started');
+        
+    } catch (error) {
+        console.error('Error during initialization:', error);
+    }
 }
 
 function createLights() {
-    // Ambient light for wireframe visibility
-    const ambientLight = new THREE.AmbientLight(0xffffff, 0.6);
+    // Increased ambient light for softer overall illumination
+    const ambientLight = new THREE.AmbientLight(0xffffff, 0.4);
     scene.add(ambientLight);
 
-    // Main directional light
-    const directionalLight = new THREE.DirectionalLight(0xffffff, lightIntensity * 0.8);
-    directionalLight.position.set(10, 10, 10);
-    directionalLight.castShadow = true;
-    directionalLight.shadow.mapSize.width = 2048;
-    directionalLight.shadow.mapSize.height = 2048;
-    scene.add(directionalLight);
+    // Centered directional light positioned above the display box
+    const mainLight = new THREE.DirectionalLight(0xffffff, lightIntensity * 1.2);
+    mainLight.position.set(0, 10, 5); // Centered above the box
+    mainLight.castShadow = true;
+    mainLight.shadow.mapSize.width = 2048;  // Slightly lower resolution for softer shadows
+    mainLight.shadow.mapSize.height = 2048;
+    mainLight.shadow.camera.near = 5;
+    mainLight.shadow.camera.far = 30;
+    mainLight.shadow.camera.left = -12;
+    mainLight.shadow.camera.right = 12;
+    mainLight.shadow.camera.top = 12;
+    mainLight.shadow.camera.bottom = -12;
+    mainLight.shadow.bias = -0.0005; // Adjusted for softer shadows
+    mainLight.shadow.radius = 8; // Add shadow softness
+    mainLight.target.position.set(0, 0, 0); // Target the center of the display box
+    scene.add(mainLight);
+    scene.add(mainLight.target);
+    
+    // Store reference for light intensity updates
+    window.mainLight = mainLight;
 
-    // Fill lights for even wireframe illumination
-    const fillLight1 = new THREE.DirectionalLight(0x4a4aff, 0.3);
-    fillLight1.position.set(-10, 0, 5);
+    // Fill lights positioned outside the box for subtle illumination
+    const fillLight1 = new THREE.DirectionalLight(0x4a4aff, 0.2);
+    fillLight1.position.set(-15, 5, 10);
     scene.add(fillLight1);
 
     const fillLight2 = new THREE.DirectionalLight(0xd4e157, 0.2);
-    fillLight2.position.set(0, -10, 5);
+    fillLight2.position.set(15, 5, 10);
     scene.add(fillLight2);
+    
+    // Rim light from behind the box for depth
+    const rimLight = new THREE.DirectionalLight(0xffffff, 0.3);
+    rimLight.position.set(0, 0, -10);
+    scene.add(rimLight);
 }
 
 function createHexagon() {
@@ -170,8 +211,8 @@ function createHexagon() {
     const material = new THREE.MeshPhongMaterial({ 
         color: hexagonColor,
         shininess: 100,
-        transparent: true,
-        opacity: 0.8,
+        transparent: false,
+        opacity: 1.0,
         wireframe: false // Always show fill
     });
     
@@ -179,6 +220,9 @@ function createHexagon() {
     hexagon.castShadow = true;
     hexagon.receiveShadow = true;
     hexagon.userData = { clickable: true, type: 'hexagon' };
+    
+    // Ensure hexagon is positioned at center
+    hexagon.position.set(0, 0, 0);
     
     // Rotate hexagon to face front (90 degrees on X axis)
     hexagon.rotation.x = Math.PI / 2;
@@ -195,6 +239,99 @@ function createHexagon() {
     });
     const wireframeHex = new THREE.Mesh(wireframeGeometry, wireframeMaterial);
     hexagon.add(wireframeHex);
+    
+    // Create 3D display box (open front)
+    createDisplayBox();
+}
+
+function createDisplayBox() {
+    const boxGroup = new THREE.Group();
+    
+    // Box dimensions based on canvas size and aspect ratio (locked on first load)
+    const canvasWidth = renderer.domElement.width;
+    const canvasHeight = renderer.domElement.height;
+    const aspectRatio = canvasWidth / canvasHeight;
+    
+    // Base the box size on the camera's field of view and distance
+    const cameraDistance = 15;
+    const fov = camera.fov * (Math.PI / 180); // Convert to radians
+    const visibleHeight = 2 * Math.tan(fov / 2) * cameraDistance;
+    const visibleWidth = visibleHeight * aspectRatio;
+    
+    // Box dimensions - make it fill the entire viewport (edges touch window borders)
+    const width = visibleWidth; // 100% of visible width
+    const height = visibleHeight; // 100% of visible height
+    const depth = Math.min(width, height) * 0.5; // Proportional depth
+    
+    console.log(`Creating locked display box: ${width.toFixed(1)} x ${height.toFixed(1)} x ${depth.toFixed(1)} (aspect: ${aspectRatio.toFixed(2)})`);
+    
+    // Material for box walls
+    const boxMaterial = new THREE.MeshPhongMaterial({
+        color: 0xf0f0f0,
+        transparent: true,
+        opacity: 0.95,
+        side: THREE.DoubleSide
+    });
+    
+    // Back wall
+    const backWall = new THREE.PlaneGeometry(width, height);
+    const backMesh = new THREE.Mesh(backWall, boxMaterial);
+    backMesh.position.z = -depth/2;
+    backMesh.receiveShadow = true;
+    boxGroup.add(backMesh);
+    
+    // Bottom wall (floor)
+    const bottomWall = new THREE.PlaneGeometry(width, depth);
+    const bottomMesh = new THREE.Mesh(bottomWall, boxMaterial);
+    bottomMesh.rotation.x = -Math.PI / 2;
+    bottomMesh.position.y = -height/2;
+    bottomMesh.receiveShadow = true;
+    boxGroup.add(bottomMesh);
+    
+    // Top wall (ceiling)
+    const topWall = new THREE.PlaneGeometry(width, depth);
+    const topMesh = new THREE.Mesh(topWall, boxMaterial);
+    topMesh.rotation.x = Math.PI / 2;
+    topMesh.position.y = height/2;
+    topMesh.receiveShadow = true;
+    boxGroup.add(topMesh);
+    
+    // Left wall
+    const leftWall = new THREE.PlaneGeometry(depth, height);
+    const leftMesh = new THREE.Mesh(leftWall, boxMaterial);
+    leftMesh.rotation.y = Math.PI / 2;
+    leftMesh.position.x = -width/2;
+    leftMesh.receiveShadow = true;
+    boxGroup.add(leftMesh);
+    
+    // Right wall
+    const rightWall = new THREE.PlaneGeometry(depth, height);
+    const rightMesh = new THREE.Mesh(rightWall, boxMaterial);
+    rightMesh.rotation.y = -Math.PI / 2;
+    rightMesh.position.x = width/2;
+    rightMesh.receiveShadow = true;
+    boxGroup.add(rightMesh);
+    
+    // Add subtle wireframe edges to enhance the box structure
+    const edgesMaterial = new THREE.LineBasicMaterial({ 
+        color: 0xcccccc,
+        transparent: true,
+        opacity: 0.5
+    });
+    
+    // Create box frame edges
+    const boxGeometry = new THREE.BoxGeometry(width, height, depth);
+    const edges = new THREE.EdgesGeometry(boxGeometry);
+    const boxEdges = new THREE.LineSegments(edges, edgesMaterial);
+    boxGroup.add(boxEdges);
+    
+    // Box stays locked at world origin (0, 0, 0)
+    boxGroup.position.set(0, 0, 0);
+    scene.add(boxGroup);
+    
+    // Store reference and dimensions
+    window.displayBox = boxGroup;
+    window.boxDimensions = { width, height, depth };
 }
 
 function createFragments() {
@@ -364,10 +501,10 @@ function explodeHexagon() {
 
     // Update button states
     const breakButton = document.getElementById('breakHologram');
-    const gravityButton = document.getElementById('gravityPull');
-    breakButton.disabled = true;
-    breakButton.textContent = 'Hologram Broken';
-    gravityButton.disabled = false; // Enable gravity button
+    if (breakButton) {
+        breakButton.disabled = true;
+        breakButton.textContent = 'Hologram Broken';
+    }
 }
 
 function focusOnFragment(fragment) {
@@ -375,40 +512,8 @@ function focusOnFragment(fragment) {
     
     focusedFragment = fragment;
     
-    // Calculate camera position to focus on fragment
-    const fragmentPosition = fragment.position.clone();
-    const offset = new THREE.Vector3(3, 2, 3);
-    const targetCameraPosition = fragmentPosition.clone().add(offset);
-    
-    // Animate camera to fragment
-    animateCamera(targetCameraPosition, fragmentPosition);
-    
-    // Show element info next to fragment
+    // Show element info modal (camera stays completely locked)
     showElementInfoAtPosition(fragment.userData.element, fragment);
-}
-
-function animateCamera(targetPosition, targetLookAt, duration = 1000) {
-    const startPosition = camera.position.clone();
-    const startLookAt = controls.target.clone();
-    const startTime = Date.now();
-    
-    function updateCamera() {
-        const elapsed = Date.now() - startTime;
-        const progress = Math.min(elapsed / duration, 1);
-        
-        // Smooth easing function
-        const easeProgress = 1 - Math.pow(1 - progress, 3);
-        
-        camera.position.lerpVectors(startPosition, targetPosition, easeProgress);
-        controls.target.lerpVectors(startLookAt, targetLookAt, easeProgress);
-        controls.update();
-        
-        if (progress < 1) {
-            requestAnimationFrame(updateCamera);
-        }
-    }
-    
-    updateCamera();
 }
 
 function returnToOverview() {
@@ -417,8 +522,7 @@ function returnToOverview() {
     focusedFragment = null;
     hideElementInfo();
     
-    // Return camera to original position
-    animateCamera(originalCameraPosition, originalControlsTarget);
+    // Camera stays completely locked - no movement
 }
 
 function resetScene() {
@@ -442,11 +546,10 @@ function resetScene() {
     
     // Update button states
     const breakButton = document.getElementById('breakHologram');
-    const gravityButton = document.getElementById('gravityPull');
-    breakButton.disabled = false;
-    breakButton.textContent = 'Break Hologram';
-    gravityButton.disabled = true;
-    gravityButton.textContent = 'Gravity Pull';
+    if (breakButton) {
+        breakButton.disabled = false;
+        breakButton.textContent = 'Break Hologram';
+    }
     
     // Remove fragments
     fragments.forEach(fragment => {
@@ -456,12 +559,15 @@ function resetScene() {
     
     // Reset hexagon
     hexagon.visible = true;
+    hexagon.position.set(0, 0, 0); // Ensure hexagon is at center
     hexagon.scale.set(1, 1, 1);
-    hexagon.material.opacity = 0.8;
-    hexagon.rotation.set(Math.PI / 2, 0, 0); // Maintain front-facing rotation
+    hexagon.material.opacity = 1.0;
+    hexagon.rotation.set(Math.PI / 2, 0, 0); // Reset rotation to initial state
     
-    // Reset camera
-    returnToOverview();
+    // Camera will automatically return to rigged position as hexagon resets
+    
+    // Reset focused fragment
+    focusedFragment = null;
     
     // Hide element info
     hideElementInfo();
@@ -528,12 +634,10 @@ function addEventListeners() {
     document.getElementById('lightIntensity').addEventListener('input', (e) => {
         lightIntensity = parseFloat(e.target.value);
         document.getElementById('lightIntensityValue').textContent = lightIntensity;
-        // Update directional light
-        scene.children.forEach(child => {
-            if (child instanceof THREE.DirectionalLight && child.intensity > 0.5) {
-                child.intensity = lightIntensity * 0.8;
-            }
-        });
+        // Update main directional light
+        if (window.mainLight) {
+            window.mainLight.intensity = lightIntensity * 1.5;
+        }
     });
     
     document.getElementById('wireframeMode').addEventListener('change', (e) => {
@@ -547,19 +651,40 @@ function addEventListeners() {
         }
     });
     
-    document.getElementById('gravityPull').addEventListener('click', () => {
-        if (isExploded && !isGravityActive) {
-            gravityPull();
-        }
-    });
+    const resetButton = document.getElementById('resetScene');
+    if (resetButton) {
+        resetButton.addEventListener('click', resetScene);
+    }
     
-    document.getElementById('resetScene').addEventListener('click', resetScene);
+    // Hozi Mode event listener (Jin Mode removed)
+    const hoziButton = document.getElementById('hoziMode');
+    if (hoziButton) {
+        hoziButton.addEventListener('click', activateHoziMode);
+    }
     
-    // Jin Mode and Hozi Mode event listeners
-    document.getElementById('jinMode').addEventListener('click', activateJinMode);
-    document.getElementById('hoziMode').addEventListener('click', activateHoziMode);
+    // Manual hexagon rotation controls
+    const rotateLeftButton = document.getElementById('rotateLeft');
+    const rotateRightButton = document.getElementById('rotateRight');
     
-    console.log('Jin Mode and Hozi Mode event listeners added');
+    if (rotateLeftButton) {
+        rotateLeftButton.addEventListener('click', () => {
+            console.log('Rotate left button clicked');
+            rotateHexagonManually(-0.1);
+        });
+    } else {
+        console.error('rotateLeft button not found');
+    }
+    
+    if (rotateRightButton) {
+        rotateRightButton.addEventListener('click', () => {
+            console.log('Rotate right button clicked');
+            rotateHexagonManually(0.1);
+        });
+    } else {
+        console.error('rotateRight button not found');
+    }
+    
+    console.log('Event listeners added successfully');
     
     // Window resize
     window.addEventListener('resize', onWindowResize);
@@ -648,14 +773,28 @@ function onKeyDown(event) {
         resetScene();
     }
     
-    // Return to overview
+    // Close fragment info modal (instead of camera movement)
     if (key === 'escape') {
-        returnToOverview();
+        if (focusedFragment) {
+            returnToOverview();
+        }
     }
     
     // Toggle controls
     if (key === 'h') {
         toggleControls();
+    }
+    
+    // Manual hexagon rotation with arrow keys
+    if (event.key === 'ArrowLeft') {
+        event.preventDefault();
+        console.log('Left arrow key pressed');
+        rotateHexagonManually(-0.1);
+    }
+    if (event.key === 'ArrowRight') {
+        event.preventDefault();
+        console.log('Right arrow key pressed');
+        rotateHexagonManually(0.1);
     }
 }
 
@@ -698,12 +837,15 @@ function onWindowResize() {
     camera.aspect = window.innerWidth / window.innerHeight;
     camera.updateProjectionMatrix();
     renderer.setSize(window.innerWidth, window.innerHeight);
+    
+    // Display box stays locked - no resizing
+    console.log('Window resized - display box stays locked');
 }
 
 function animate() {
     animationId = requestAnimationFrame(animate);
     
-    // Rotate hexagon
+    // Rotate hexagon (camera stays completely fixed)
     if (hexagon && hexagon.visible) {
         hexagon.rotation.y += rotationSpeed;
     }
@@ -719,8 +861,8 @@ function animate() {
             fragment.rotation.y += fragment.userData.rotationVelocity.y;
             fragment.rotation.z += fragment.userData.rotationVelocity.z;
             
-            // Bounce off boundaries
-            const boundary = 12;
+            // Bounce off boundaries (within the display box)
+            const boundary = 8;
             if (Math.abs(fragment.position.x) > boundary) {
                 fragment.userData.velocity.x *= -0.7;
                 fragment.position.x = Math.sign(fragment.position.x) * boundary;
@@ -751,7 +893,7 @@ function animate() {
             particle.rotation.z += particle.userData.rotationVelocity.z;
             
             // Bounce off boundaries (same as fragments)
-            const boundary = 12;
+            const boundary = 8;
             if (Math.abs(particle.position.x) > boundary) {
                 particle.userData.velocity.x *= -0.7;
                 particle.position.x = Math.sign(particle.position.x) * boundary;
@@ -774,9 +916,6 @@ function animate() {
     if (focusedFragment) {
         showElementInfoAtPosition(focusedFragment.userData.element, focusedFragment);
     }
-    
-    // Update controls
-    controls.update();
     
     // Render
     renderer.render(scene, camera);
@@ -863,7 +1002,7 @@ function reformHexagon() {
         } else {
             // Reset everything to normal state
             hexagon.scale.set(1, 1, 1);
-            hexagon.material.opacity = 0.8;
+            hexagon.material.opacity = 1.0;
             
             // Clean up fragments
             fragments.forEach(fragment => {
@@ -992,5 +1131,24 @@ function removeFloatingEyes() {
     floatingEyes = [];
 }
 
+// Manual hexagon rotation function
+function rotateHexagonManually(angle) {
+    console.log('rotateHexagonManually called with angle:', angle);
+    console.log('hexagon exists:', !!hexagon);
+    console.log('hexagon visible:', hexagon ? hexagon.visible : 'N/A');
+    
+    if (hexagon && hexagon.visible) {
+        const oldRotation = hexagon.rotation.y;
+        hexagon.rotation.y += angle;
+        console.log('Hexagon rotation changed from', oldRotation, 'to', hexagon.rotation.y);
+    } else {
+        console.log('Cannot rotate: hexagon not available or not visible');
+    }
+}
+
 // Initialize when page loads
-window.addEventListener('load', init); 
+console.log('Setting up window load event listener...');
+window.addEventListener('load', () => {
+    console.log('Window load event fired!');
+    init();
+}); 

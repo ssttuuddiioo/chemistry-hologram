@@ -362,15 +362,18 @@
 <body>
     <div id="container">
         <button id="controlsToggle">⚙</button>
-        <button id="resetScene">RESET</button>
-        <button id="hoziMode">HOZI</button>
         
         <div id="controls">
             <h3 style="color: #4a4aff; margin: 0 0 8px 0; font-size: 12px; text-transform: uppercase; letter-spacing: 1px; border-bottom: 1px solid #d4e157; padding-bottom: 3px;">Scene Controls</h3>
             <div class="control-group">
-                <label for="rotationSpeed">Rotation Speed</label>
+                <label for="rotationSpeed">Auto Rotation Speed</label>
                 <input type="range" id="rotationSpeed" min="0" max="0.02" step="0.001" value="0.005">
                 <span id="rotationSpeedValue" class="value-display">0.005</span>
+            </div>
+            <div class="control-group">
+                <label>Manual Hexagon Rotation</label>
+                <button id="rotateLeft">← Rotate Left</button>
+                <button id="rotateRight">Rotate Right →</button>
             </div>
             <div class="control-group">
                 <label for="fragmentSpeed">Fragment Speed</label>
@@ -393,17 +396,21 @@
             <div class="control-group">
                 <button id="breakHologram">Break Hologram</button>
             </div>
+            <div class="control-group">
+                <button id="resetScene">RESET</button>
+            </div>
+            <div class="control-group">
+                <button id="hoziMode">HOZI</button>
+            </div>
             
             <div class="control-section">
                 <h4>Instructions:</h4>
                 <div class="info-text">
                     • Click hexagon to break it<br>
-                    • Use "Break Hologram" button<br>
-                    • Use "Gravity Pull" to reform<br>
-                    • Click fragments for details<br>
-                    • Use mouse to orbit camera<br>
-                    • Scroll to zoom in/out<br>
-                    • ESC to return to overview
+                    • Click fragments for info modal<br>
+                    • Use rotation buttons to turn hexagon<br>
+                    • Camera stays locked in position<br>
+                    • ESC to close fragment info
                 </div>
             </div>
             
@@ -412,33 +419,12 @@
                 <div class="info-text">
                     1-9: Select Elements<br>
                     R: Reset Scene<br>
-                    ESC: Back to Overview<br>
+                    ESC: Close Fragment Info<br>
                     H: Hide/Show Controls<br>
-                    Mouse: Rotate Camera<br>
-                    Scroll: Zoom
+                    ←/→: Rotate Hexagon<br>
+                    Camera: Always Locked
                 </div>
             </div>
-        </div>
-
-        <div id="shortcuts">
-            <strong style="color: #4a4aff;">SHORTCUTS:</strong><br>
-            1-9: Select Elements<br>
-            R: Reset Scene<br>
-            ESC: Back to Overview<br>
-            H: Hide/Show Controls<br>
-            Mouse: Rotate Camera<br>
-            Scroll: Zoom
-        </div>
-
-        <div id="instructions">
-            <strong style="color: #4a4aff;">INSTRUCTIONS:</strong><br>
-            • Click hexagon to break it<br>
-            • Use "Break Hologram" button<br>
-            • Use "Gravity Pull" to reform<br>
-            • Click fragments for details<br>
-            • Use mouse to orbit camera<br>
-            • Scroll to zoom in/out<br>
-            • ESC to return to overview
         </div>
 
         <div id="elementInfo">
@@ -449,7 +435,6 @@
     </div>
 
     <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
-    <script src="app.js?v=1.1"></script>
+    <script src="app.js?v=2.4" onload="console.log('app.js loaded successfully')" onerror="console.error('Failed to load app.js')"></script>
 </body>
 </html> 
