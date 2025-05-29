@@ -559,6 +559,8 @@ function addEventListeners() {
     document.getElementById('jinMode').addEventListener('click', activateJinMode);
     document.getElementById('hoziMode').addEventListener('click', activateHoziMode);
     
+    console.log('Jin Mode and Hozi Mode event listeners added');
+    
     // Window resize
     window.addEventListener('resize', onWindowResize);
 }
@@ -888,6 +890,7 @@ function reformHexagon() {
 }
 
 function activateJinMode() {
+    console.log('Jin Mode activated!');
     if (isJinModeActive) return;
     
     isJinModeActive = true;
@@ -952,6 +955,7 @@ function hideHoziButton() {
 }
 
 function activateHoziMode() {
+    console.log('Hozi Mode activated!');
     if (isHoziModeActive) return;
     
     isHoziModeActive = true;
