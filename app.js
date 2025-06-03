@@ -99,6 +99,11 @@ let lightIntensity = 1;
 let wireframeMode = true;
 let controlsVisible = true;
 
+// Add debug mode variables
+let debugMode = false;
+let lightDebugHelpers = [];
+let debugActiveTab = 'lights'; // Default active tab
+
 // Initialize the scene
 function init() {
     console.log('Initializing scene...');
@@ -154,6 +159,13 @@ function init() {
         // Add event listeners
         addEventListeners();
         console.log('Event listeners added');
+        
+        // Create debug controls
+        createDebugControls();
+        
+        // Add debug mode toggle button
+        addDebugToggle();
+        console.log('Debug controls created');
 
         // Start animation loop
         animate();
@@ -165,82 +177,140 @@ function init() {
 }
 
 function createLights() {
-    // Increased ambient light for softer overall illumination
-    const ambientLight = new THREE.AmbientLight(0xffffff, 0.4);
+    // Reduced ambient light to prevent overexposure
+    const ambientLight = new THREE.AmbientLight(0xffffff, 0.2);
     scene.add(ambientLight);
+    
+    // Store reference for ambient light
+    window.ambientLight = ambientLight;
 
-    // Centered directional light positioned above the display box
-    const mainLight = new THREE.DirectionalLight(0xffffff, lightIntensity * 1.2);
-    mainLight.position.set(0, 10, 5); // Centered above the box
+    // Main light positioned extremely far behind the camera, but with reduced intensity
+    const mainLight = new THREE.DirectionalLight(0xffffff, lightIntensity * 0.8);
+    mainLight.position.set(0, 0, 100); // Keep the distance
     mainLight.castShadow = true;
-    mainLight.shadow.mapSize.width = 2048;  // Slightly lower resolution for softer shadows
+    mainLight.shadow.mapSize.width = 2048;
     mainLight.shadow.mapSize.height = 2048;
     mainLight.shadow.camera.near = 5;
-    mainLight.shadow.camera.far = 30;
-    mainLight.shadow.camera.left = -12;
-    mainLight.shadow.camera.right = 12;
-    mainLight.shadow.camera.top = 12;
-    mainLight.shadow.camera.bottom = -12;
-    mainLight.shadow.bias = -0.0005; // Adjusted for softer shadows
-    mainLight.shadow.radius = 8; // Add shadow softness
-    mainLight.target.position.set(0, 0, 0); // Target the center of the display box
+    mainLight.shadow.camera.far = 120;
+    mainLight.shadow.camera.left = -15;
+    mainLight.shadow.camera.right = 15;
+    mainLight.shadow.camera.top = 15;
+    mainLight.shadow.camera.bottom = -15;
+    mainLight.shadow.bias = -0.0005;
+    mainLight.shadow.radius = 8;
+    mainLight.target.position.set(0, 0, 0);
     scene.add(mainLight);
     scene.add(mainLight.target);
     
     // Store reference for light intensity updates
     window.mainLight = mainLight;
 
-    // Fill lights positioned outside the box for subtle illumination
+    // Add a spotlight with reduced intensity
+    const spotLight = new THREE.SpotLight(0xffffff, 0.7);
+    spotLight.position.set(0, 5, 80);
+    spotLight.angle = Math.PI / 8;
+    spotLight.penumbra = 0.3;
+    spotLight.decay = 0.5;
+    spotLight.distance = 150;
+    spotLight.castShadow = true;
+    spotLight.shadow.bias = -0.0001;
+    spotLight.target.position.set(0, 0, 0);
+    scene.add(spotLight);
+    scene.add(spotLight.target);
+    
+    // Store reference for spotlight
+    window.spotLight = spotLight;
+
+    // Fill lights with reduced intensity
     const fillLight1 = new THREE.DirectionalLight(0x4a4aff, 0.2);
-    fillLight1.position.set(-15, 5, 10);
+    fillLight1.position.set(-20, 5, 60);
     scene.add(fillLight1);
+    
+    // Store reference for fill light 1
+    window.fillLight1 = fillLight1;
 
     const fillLight2 = new THREE.DirectionalLight(0xd4e157, 0.2);
-    fillLight2.position.set(15, 5, 10);
+    fillLight2.position.set(20, 5, 60);
     scene.add(fillLight2);
     
-    // Rim light from behind the box for depth
-    const rimLight = new THREE.DirectionalLight(0xffffff, 0.3);
-    rimLight.position.set(0, 0, -10);
-    scene.add(rimLight);
+    // Store reference for fill light 2
+    window.fillLight2 = fillLight2;
 }
 
 function createHexagon() {
-    // 50% more extruded hexagon (2.25 * 1.5 = 3.375)
-    const geometry = new THREE.CylinderGeometry(2.5, 2.5, 3.375, 6);
-    const material = new THREE.MeshPhongMaterial({ 
-        color: hexagonColor,
-        shininess: 100,
+    // We're replacing the hexagon with a sphere that has text wrapping around it
+    
+    // Create a sphere to represent the Universal-style logo
+    const sphereGeometry = new THREE.SphereGeometry(3, 64, 64);
+    const sphereMaterial = new THREE.MeshPhongMaterial({
+        color: 0x3366cc,
+        shininess: 30,
         transparent: false,
         opacity: 1.0,
-        wireframe: false // Always show fill
+        emissive: 0x111122,
+        emissiveIntensity: 0.1,
+        specular: 0x555555
     });
     
-    hexagon = new THREE.Mesh(geometry, material);
+    hexagon = new THREE.Mesh(sphereGeometry, sphereMaterial);
     hexagon.castShadow = true;
     hexagon.receiveShadow = true;
-    hexagon.userData = { clickable: true, type: 'hexagon' };
+    hexagon.userData = { clickable: true, type: 'hexagon' }; // Keep same userData for compatibility
     
-    // Ensure hexagon is positioned at center
+    // Position the sphere at the center (explosion point)
     hexagon.position.set(0, 0, 0);
-    
-    // Rotate hexagon to face front (90 degrees on X axis)
-    hexagon.rotation.x = Math.PI / 2;
     
     scene.add(hexagon);
 
-    // Add white wireframe outline
-    const wireframeGeometry = new THREE.CylinderGeometry(2.5, 2.5, 3.375, 6);
-    const wireframeMaterial = new THREE.MeshBasicMaterial({
-        color: 0xffffff,
-        wireframe: true,
-        transparent: true,
-        opacity: 0.6
-    });
-    const wireframeHex = new THREE.Mesh(wireframeGeometry, wireframeMaterial);
-    hexagon.add(wireframeHex);
+    // Create a ring for the text to follow
+    const textRadius = 3.1; // Slightly larger than sphere radius
+    const textRing = new THREE.Group();
     
-    // Create 3D display box (open front)
+    // Create text geometry for "WELCOME TO CHEMISTRY"
+    const text = "WELCOME TO CHEMISTRY";
+    const fontLoader = new THREE.FontLoader();
+    
+    // Load font and create 3D text
+    // Since we can't load external fonts in this environment, we'll create placeholders 
+    // for the text positions around the sphere
+    const totalLetters = text.length;
+    
+    for (let i = 0; i < totalLetters; i++) {
+        const angle = (i / totalLetters) * Math.PI * 2;
+        const letter = text[i];
+        
+        // Create a cube as a placeholder for each letter
+        const letterGeometry = new THREE.BoxGeometry(0.25, 0.6, 0.1);
+        const letterMaterial = new THREE.MeshPhongMaterial({
+            color: 0xffffff,
+            emissive: 0xaaaaff,
+            emissiveIntensity: 0.5,
+            transparent: false, // Ensure letters are not transparent
+            opacity: 1.0, // Full opacity
+            shininess: 30
+        });
+        
+        const letterMesh = new THREE.Mesh(letterGeometry, letterMaterial);
+        
+        // Position letters around the sphere
+        letterMesh.position.x = textRadius * Math.sin(angle);
+        letterMesh.position.z = textRadius * Math.cos(angle);
+        
+        // Rotate letters to face outward
+        letterMesh.rotation.y = Math.PI - angle;
+        
+        // Add to ring
+        textRing.add(letterMesh);
+    }
+    
+    // Add text ring to scene
+    textRing.rotation.x = Math.PI / 10; // Tilt slightly like Universal logo
+    scene.add(textRing);
+    
+    // Store reference to text ring for animation
+    window.textRing = textRing;
+    
+    // Create display box (with only back wall)
     createDisplayBox();
 }
 
@@ -263,67 +333,22 @@ function createDisplayBox() {
     const height = visibleHeight; // 100% of visible height
     const depth = Math.min(width, height) * 0.5; // Proportional depth
     
-    console.log(`Creating locked display box: ${width.toFixed(1)} x ${height.toFixed(1)} x ${depth.toFixed(1)} (aspect: ${aspectRatio.toFixed(2)})`);
+    console.log(`Creating back wall: ${width.toFixed(1)} x ${height.toFixed(1)} (aspect: ${aspectRatio.toFixed(2)})`);
     
-    // Material for box walls
+    // Material for back wall
     const boxMaterial = new THREE.MeshPhongMaterial({
         color: 0xf0f0f0,
-        transparent: true,
-        opacity: 0.95,
+        transparent: false, // No transparency
+        opacity: 1.0, // Full opacity
         side: THREE.DoubleSide
     });
     
-    // Back wall
+    // Back wall (only keeping this part)
     const backWall = new THREE.PlaneGeometry(width, height);
     const backMesh = new THREE.Mesh(backWall, boxMaterial);
     backMesh.position.z = -depth/2;
     backMesh.receiveShadow = true;
     boxGroup.add(backMesh);
-    
-    // Bottom wall (floor)
-    const bottomWall = new THREE.PlaneGeometry(width, depth);
-    const bottomMesh = new THREE.Mesh(bottomWall, boxMaterial);
-    bottomMesh.rotation.x = -Math.PI / 2;
-    bottomMesh.position.y = -height/2;
-    bottomMesh.receiveShadow = true;
-    boxGroup.add(bottomMesh);
-    
-    // Top wall (ceiling)
-    const topWall = new THREE.PlaneGeometry(width, depth);
-    const topMesh = new THREE.Mesh(topWall, boxMaterial);
-    topMesh.rotation.x = Math.PI / 2;
-    topMesh.position.y = height/2;
-    topMesh.receiveShadow = true;
-    boxGroup.add(topMesh);
-    
-    // Left wall
-    const leftWall = new THREE.PlaneGeometry(depth, height);
-    const leftMesh = new THREE.Mesh(leftWall, boxMaterial);
-    leftMesh.rotation.y = Math.PI / 2;
-    leftMesh.position.x = -width/2;
-    leftMesh.receiveShadow = true;
-    boxGroup.add(leftMesh);
-    
-    // Right wall
-    const rightWall = new THREE.PlaneGeometry(depth, height);
-    const rightMesh = new THREE.Mesh(rightWall, boxMaterial);
-    rightMesh.rotation.y = -Math.PI / 2;
-    rightMesh.position.x = width/2;
-    rightMesh.receiveShadow = true;
-    boxGroup.add(rightMesh);
-    
-    // Add subtle wireframe edges to enhance the box structure
-    const edgesMaterial = new THREE.LineBasicMaterial({ 
-        color: 0xcccccc,
-        transparent: true,
-        opacity: 0.5
-    });
-    
-    // Create box frame edges
-    const boxGeometry = new THREE.BoxGeometry(width, height, depth);
-    const edges = new THREE.EdgesGeometry(boxGeometry);
-    const boxEdges = new THREE.LineSegments(edges, edgesMaterial);
-    boxGroup.add(boxEdges);
     
     // Box stays locked at world origin (0, 0, 0)
     boxGroup.position.set(0, 0, 0);
@@ -370,8 +395,8 @@ function createFragments() {
         const material = new THREE.MeshPhongMaterial({
             color: element.color,
             shininess: 80,
-            transparent: true,
-            opacity: 0.7,
+            transparent: false, // Ensure fragments are not transparent
+            opacity: 1.0, // Full opacity
             wireframe: false // Always show fill
         });
 
@@ -419,8 +444,8 @@ function createFragments() {
         const wireframeMaterial = new THREE.MeshBasicMaterial({
             color: 0xffffff,
             wireframe: true,
-            transparent: true,
-            opacity: 0.5
+            transparent: false, // No transparency
+            opacity: 1.0 // Full opacity
         });
         const wireframeFragment = new THREE.Mesh(wireframeGeometry, wireframeMaterial);
         fragment.add(wireframeFragment);
@@ -443,16 +468,21 @@ function explodeHexagon() {
     
     isExploded = true;
     
+    // Hide the text ring during explosion
+    if (window.textRing) {
+        window.textRing.visible = false;
+    }
+    
     // Clean up Hozi mode if active
     if (isHoziModeActive) {
         removeFloatingEyes();
         isHoziModeActive = false;
     }
     
-    // Create fragments at hexagon position FIRST
+    // Create fragments at sphere position FIRST
     createFragments();
     
-    // Start hexagon break animation AND fragment explosion simultaneously
+    // Start sphere break animation AND fragment explosion simultaneously
     const hexagonTween = {
         scale: { x: 1, y: 1, z: 1 },
         opacity: 0.8
@@ -461,7 +491,7 @@ function explodeHexagon() {
     // Start fragment explosion immediately
     setTimeout(() => {
         fragments.forEach((fragment, index) => {
-            // Calculate explosion direction from center
+            // Calculate explosion direction from center (where the sphere is)
             const angle = (index / fragments.length) * Math.PI * 2;
             const explosionForce = 0.15 + Math.random() * 0.1;
             
@@ -557,14 +587,21 @@ function resetScene() {
     });
     fragments = [];
     
-    // Reset hexagon
+    // Reset sphere
     hexagon.visible = true;
-    hexagon.position.set(0, 0, 0); // Ensure hexagon is at center
+    hexagon.position.set(0, 0, 0); // Ensure sphere is at center
     hexagon.scale.set(1, 1, 1);
     hexagon.material.opacity = 1.0;
-    hexagon.rotation.set(Math.PI / 2, 0, 0); // Reset rotation to initial state
+    hexagon.rotation.set(0, 0, 0); // Reset rotation
     
-    // Camera will automatically return to rigged position as hexagon resets
+    // Show text ring again
+    if (window.textRing) {
+        window.textRing.visible = true;
+        window.textRing.rotation.x = Math.PI / 10; // Reset tilt
+        window.textRing.rotation.y = 0; // Reset rotation
+    }
+    
+    // Camera will automatically return to rigged position as sphere resets
     
     // Reset focused fragment
     focusedFragment = null;
@@ -572,7 +609,7 @@ function resetScene() {
     // Hide element info
     hideElementInfo();
     
-    // Show Hozi button since hexagon is now complete
+    // Show Hozi button since sphere is now complete
     showHoziButton();
 }
 
@@ -636,7 +673,11 @@ function addEventListeners() {
         document.getElementById('lightIntensityValue').textContent = lightIntensity;
         // Update main directional light
         if (window.mainLight) {
-            window.mainLight.intensity = lightIntensity * 1.5;
+            window.mainLight.intensity = lightIntensity * 0.8;
+        }
+        // Update spotlight intensity
+        if (window.spotLight) {
+            window.spotLight.intensity = lightIntensity * 0.7;
         }
     });
     
@@ -845,9 +886,14 @@ function onWindowResize() {
 function animate() {
     animationId = requestAnimationFrame(animate);
     
-    // Rotate hexagon (camera stays completely fixed)
+    // Rotate sphere slowly
     if (hexagon && hexagon.visible) {
-        hexagon.rotation.y += rotationSpeed;
+        hexagon.rotation.y += rotationSpeed * 0.5; // Slower rotation for sphere
+    }
+    
+    // Rotate the text ring (in opposite direction for dramatic effect)
+    if (window.textRing) {
+        window.textRing.rotation.y -= rotationSpeed * 0.3;
     }
     
     // Animate fragments
@@ -915,6 +961,13 @@ function animate() {
     // Update info panel position if focused on fragment
     if (focusedFragment) {
         showElementInfoAtPosition(focusedFragment.userData.element, focusedFragment);
+    }
+    
+    // Update light helpers if debug mode is active
+    if (debugMode && lightDebugHelpers.length > 0) {
+        lightDebugHelpers.forEach(helper => {
+            helper.update();
+        });
     }
     
     // Render
@@ -1143,6 +1196,905 @@ function rotateHexagonManually(angle) {
         console.log('Hexagon rotation changed from', oldRotation, 'to', hexagon.rotation.y);
     } else {
         console.log('Cannot rotate: hexagon not available or not visible');
+    }
+}
+
+// Add debug controls function
+function createDebugControls() {
+    const debugPanel = document.createElement('div');
+    debugPanel.id = 'debugPanel';
+    debugPanel.style.position = 'absolute';
+    debugPanel.style.top = '10px';
+    debugPanel.style.right = '10px';
+    debugPanel.style.background = 'rgba(0, 0, 0, 0.8)';
+    debugPanel.style.color = 'white';
+    debugPanel.style.padding = '10px';
+    debugPanel.style.borderRadius = '5px';
+    debugPanel.style.zIndex = '1000';
+    debugPanel.style.display = debugMode ? 'block' : 'none';
+    debugPanel.style.width = '300px';
+    debugPanel.style.maxHeight = '85vh';
+    debugPanel.style.overflowY = 'auto';
+    
+    // Add tabs for different control sections
+    let html = '<div class="debug-tabs" style="display: flex; margin-bottom: 15px;">';
+    html += '<div id="tab-lights" class="debug-tab" style="flex: 1; text-align: center; padding: 8px; background: ' + (debugActiveTab === 'lights' ? '#4a4aff' : '#333') + '; cursor: pointer; border-radius: 3px 0 0 3px;">Lights</div>';
+    html += '<div id="tab-sphere" class="debug-tab" style="flex: 1; text-align: center; padding: 8px; background: ' + (debugActiveTab === 'sphere' ? '#4a4aff' : '#333') + '; cursor: pointer;">Sphere</div>';
+    html += '<div id="tab-camera" class="debug-tab" style="flex: 1; text-align: center; padding: 8px; background: ' + (debugActiveTab === 'camera' ? '#4a4aff' : '#333') + '; cursor: pointer;">Camera</div>';
+    html += '<div id="tab-scene" class="debug-tab" style="flex: 1; text-align: center; padding: 8px; background: ' + (debugActiveTab === 'scene' ? '#4a4aff' : '#333') + '; cursor: pointer; border-radius: 0 3px 3px 0;">Scene</div>';
+    html += '</div>';
+    
+    // LIGHTS TAB
+    html += '<div id="lights-panel" class="debug-panel" style="display: ' + (debugActiveTab === 'lights' ? 'block' : 'none') + ';">';
+    html += '<h3 style="margin: 0 0 10px 0; color: #4a4aff;">Light Controls</h3>';
+    
+    // Main Light controls
+    html += '<div style="margin-bottom: 15px;">';
+    html += '<h4 style="margin: 0 0 5px 0; color: #d4e157;">Main Light</h4>';
+    
+    html += '<label>X Position: <span id="mainLightX">0</span></label><br>';
+    html += '<input type="range" id="mainLightXControl" min="-100" max="100" value="0" style="width: 100%"><br>';
+    
+    html += '<label>Y Position: <span id="mainLightY">0</span></label><br>';
+    html += '<input type="range" id="mainLightYControl" min="-100" max="100" value="5" style="width: 100%"><br>';
+    
+    html += '<label>Z Position: <span id="mainLightZ">100</span></label><br>';
+    html += '<input type="range" id="mainLightZControl" min="-100" max="200" value="100" style="width: 100%"><br>';
+    
+    html += '<label>Intensity: <span id="mainLightIntensity">0.8</span></label><br>';
+    html += '<input type="range" id="mainLightIntensityControl" min="0" max="5" step="0.1" value="0.8" style="width: 100%"><br>';
+    html += '</div>';
+    
+    // Spotlight controls
+    html += '<div style="margin-bottom: 15px;">';
+    html += '<h4 style="margin: 0 0 5px 0; color: #d4e157;">Spotlight</h4>';
+    
+    html += '<label>X Position: <span id="spotLightX">0</span></label><br>';
+    html += '<input type="range" id="spotLightXControl" min="-100" max="100" value="0" style="width: 100%"><br>';
+    
+    html += '<label>Y Position: <span id="spotLightY">5</span></label><br>';
+    html += '<input type="range" id="spotLightYControl" min="-100" max="100" value="5" style="width: 100%"><br>';
+    
+    html += '<label>Z Position: <span id="spotLightZ">80</span></label><br>';
+    html += '<input type="range" id="spotLightZControl" min="-100" max="200" value="80" style="width: 100%"><br>';
+    
+    html += '<label>Intensity: <span id="spotLightIntensity">0.7</span></label><br>';
+    html += '<input type="range" id="spotLightIntensityControl" min="0" max="5" step="0.1" value="0.7" style="width: 100%"><br>';
+    
+    html += '<label>Angle: <span id="spotLightAngle">' + (Math.PI/8).toFixed(2) + '</span></label><br>';
+    html += '<input type="range" id="spotLightAngleControl" min="0.1" max="1.5" step="0.05" value="' + (Math.PI/8) + '" style="width: 100%"><br>';
+    
+    html += '<label>Penumbra: <span id="spotLightPenumbra">0.3</span></label><br>';
+    html += '<input type="range" id="spotLightPenumbraControl" min="0" max="1" step="0.05" value="0.3" style="width: 100%"><br>';
+    html += '</div>';
+    
+    // Fill Light 1 controls
+    html += '<div style="margin-bottom: 15px;">';
+    html += '<h4 style="margin: 0 0 5px 0; color: #d4e157;">Fill Light 1 (Blue)</h4>';
+    
+    html += '<label>X Position: <span id="fillLight1X">-20</span></label><br>';
+    html += '<input type="range" id="fillLight1XControl" min="-100" max="100" value="-20" style="width: 100%"><br>';
+    
+    html += '<label>Y Position: <span id="fillLight1Y">5</span></label><br>';
+    html += '<input type="range" id="fillLight1YControl" min="-100" max="100" value="5" style="width: 100%"><br>';
+    
+    html += '<label>Z Position: <span id="fillLight1Z">60</span></label><br>';
+    html += '<input type="range" id="fillLight1ZControl" min="-100" max="200" value="60" style="width: 100%"><br>';
+    
+    html += '<label>Intensity: <span id="fillLight1Intensity">0.2</span></label><br>';
+    html += '<input type="range" id="fillLight1IntensityControl" min="0" max="2" step="0.1" value="0.2" style="width: 100%"><br>';
+    html += '</div>';
+    
+    // Fill Light 2 controls
+    html += '<div style="margin-bottom: 15px;">';
+    html += '<h4 style="margin: 0 0 5px 0; color: #d4e157;">Fill Light 2 (Green)</h4>';
+    
+    html += '<label>X Position: <span id="fillLight2X">20</span></label><br>';
+    html += '<input type="range" id="fillLight2XControl" min="-100" max="100" value="20" style="width: 100%"><br>';
+    
+    html += '<label>Y Position: <span id="fillLight2Y">5</span></label><br>';
+    html += '<input type="range" id="fillLight2YControl" min="-100" max="100" value="5" style="width: 100%"><br>';
+    
+    html += '<label>Z Position: <span id="fillLight2Z">60</span></label><br>';
+    html += '<input type="range" id="fillLight2ZControl" min="-100" max="200" value="60" style="width: 100%"><br>';
+    
+    html += '<label>Intensity: <span id="fillLight2Intensity">0.2</span></label><br>';
+    html += '<input type="range" id="fillLight2IntensityControl" min="0" max="2" step="0.1" value="0.2" style="width: 100%"><br>';
+    html += '</div>';
+    
+    // Ambient Light controls
+    html += '<div style="margin-bottom: 15px;">';
+    html += '<h4 style="margin: 0 0 5px 0; color: #d4e157;">Ambient Light</h4>';
+    
+    html += '<label>Intensity: <span id="ambientLightIntensity">0.2</span></label><br>';
+    html += '<input type="range" id="ambientLightIntensityControl" min="0" max="1" step="0.05" value="0.2" style="width: 100%"><br>';
+    html += '</div>';
+    
+    // Helper visibility control
+    html += '<div style="margin-bottom: 15px;">';
+    html += '<label><input type="checkbox" id="showLightHelpers"> Show Light Helpers</label>';
+    html += '</div>';
+    
+    // Export button
+    html += '<button id="exportLightSettings" style="width: 100%; padding: 8px; background: #4a4aff; color: white; border: none; border-radius: 4px; cursor: pointer;">Export Light Settings</button>';
+    html += '</div>'; // End of Lights Tab
+    
+    // SPHERE TAB
+    html += '<div id="sphere-panel" class="debug-panel" style="display: ' + (debugActiveTab === 'sphere' ? 'block' : 'none') + ';">';
+    html += '<h3 style="margin: 0 0 10px 0; color: #4a4aff;">Sphere Controls</h3>';
+    
+    // Sphere Position
+    html += '<div style="margin-bottom: 15px;">';
+    html += '<h4 style="margin: 0 0 5px 0; color: #d4e157;">Position</h4>';
+    
+    html += '<label>X Position: <span id="sphereX">0</span></label><br>';
+    html += '<input type="range" id="sphereXControl" min="-10" max="10" step="0.1" value="0" style="width: 100%"><br>';
+    
+    html += '<label>Y Position: <span id="sphereY">0</span></label><br>';
+    html += '<input type="range" id="sphereYControl" min="-10" max="10" step="0.1" value="0" style="width: 100%"><br>';
+    
+    html += '<label>Z Position: <span id="sphereZ">0</span></label><br>';
+    html += '<input type="range" id="sphereZControl" min="-10" max="10" step="0.1" value="0" style="width: 100%"><br>';
+    html += '</div>';
+    
+    // Sphere Material
+    html += '<div style="margin-bottom: 15px;">';
+    html += '<h4 style="margin: 0 0 5px 0; color: #d4e157;">Material</h4>';
+    
+    html += '<label>Color: </label>';
+    html += '<input type="color" id="sphereColorControl" value="#3366cc" style="width: 100%"><br><br>';
+    
+    html += '<label>Shininess: <span id="sphereShininess">30</span></label><br>';
+    html += '<input type="range" id="sphereShininessControl" min="0" max="200" value="30" style="width: 100%"><br>';
+    
+    html += '<label>Emissive Intensity: <span id="sphereEmissiveIntensity">0.1</span></label><br>';
+    html += '<input type="range" id="sphereEmissiveIntensityControl" min="0" max="1" step="0.05" value="0.1" style="width: 100%"><br>';
+    
+    html += '<label>Emissive Color: </label>';
+    html += '<input type="color" id="sphereEmissiveColorControl" value="#111122" style="width: 100%"><br>';
+    html += '</div>';
+    
+    // Sphere Size & Rotation
+    html += '<div style="margin-bottom: 15px;">';
+    html += '<h4 style="margin: 0 0 5px 0; color: #d4e157;">Size & Rotation</h4>';
+    
+    html += '<label>Radius: <span id="sphereRadius">3</span></label><br>';
+    html += '<input type="range" id="sphereRadiusControl" min="0.5" max="10" step="0.1" value="3" style="width: 100%"><br>';
+    
+    html += '<label>Rotation Speed: <span id="sphereRotationSpeed">' + rotationSpeed + '</span></label><br>';
+    html += '<input type="range" id="sphereRotationSpeedControl" min="0" max="0.05" step="0.001" value="' + rotationSpeed + '" style="width: 100%"><br>';
+    html += '</div>';
+    
+    // Text Ring
+    html += '<div style="margin-bottom: 15px;">';
+    html += '<h4 style="margin: 0 0 5px 0; color: #d4e157;">Text Ring</h4>';
+    
+    html += '<label>Text Radius: <span id="textRadius">3.1</span></label><br>';
+    html += '<input type="range" id="textRadiusControl" min="2.5" max="10" step="0.1" value="3.1" style="width: 100%"><br>';
+    
+    html += '<label>Text Tilt: <span id="textTilt">' + (Math.PI/10).toFixed(2) + '</span></label><br>';
+    html += '<input type="range" id="textTiltControl" min="0" max="1.57" step="0.05" value="' + (Math.PI/10) + '" style="width: 100%"><br>';
+    
+    html += '<label>Text Color: </label>';
+    html += '<input type="color" id="textColorControl" value="#ffffff" style="width: 100%"><br>';
+    
+    html += '<label>Text Emissive: </label>';
+    html += '<input type="color" id="textEmissiveColorControl" value="#aaaaff" style="width: 100%"><br>';
+    html += '</div>';
+    html += '</div>'; // End of Sphere Tab
+    
+    // CAMERA TAB
+    html += '<div id="camera-panel" class="debug-panel" style="display: ' + (debugActiveTab === 'camera' ? 'block' : 'none') + ';">';
+    html += '<h3 style="margin: 0 0 10px 0; color: #4a4aff;">Camera Controls</h3>';
+    
+    // Camera Position
+    html += '<div style="margin-bottom: 15px;">';
+    html += '<h4 style="margin: 0 0 5px 0; color: #d4e157;">Position</h4>';
+    
+    html += '<label>X Position: <span id="cameraX">0</span></label><br>';
+    html += '<input type="range" id="cameraXControl" min="-30" max="30" value="0" style="width: 100%"><br>';
+    
+    html += '<label>Y Position: <span id="cameraY">0</span></label><br>';
+    html += '<input type="range" id="cameraYControl" min="-30" max="30" value="0" style="width: 100%"><br>';
+    
+    html += '<label>Z Position: <span id="cameraZ">15</span></label><br>';
+    html += '<input type="range" id="cameraZControl" min="3" max="50" value="15" style="width: 100%"><br>';
+    html += '</div>';
+    
+    // Camera Field of View
+    html += '<div style="margin-bottom: 15px;">';
+    html += '<h4 style="margin: 0 0 5px 0; color: #d4e157;">Field of View</h4>';
+    
+    html += '<label>FOV: <span id="cameraFOV">75</span></label><br>';
+    html += '<input type="range" id="cameraFOVControl" min="20" max="120" value="75" style="width: 100%"><br>';
+    html += '</div>';
+    
+    // Camera Look At
+    html += '<div style="margin-bottom: 15px;">';
+    html += '<h4 style="margin: 0 0 5px 0; color: #d4e157;">Look At</h4>';
+    
+    html += '<label>Target X: <span id="cameraTargetX">0</span></label><br>';
+    html += '<input type="range" id="cameraTargetXControl" min="-10" max="10" value="0" style="width: 100%"><br>';
+    
+    html += '<label>Target Y: <span id="cameraTargetY">0</span></label><br>';
+    html += '<input type="range" id="cameraTargetYControl" min="-10" max="10" value="0" style="width: 100%"><br>';
+    
+    html += '<label>Target Z: <span id="cameraTargetZ">0</span></label><br>';
+    html += '<input type="range" id="cameraTargetZControl" min="-10" max="10" value="0" style="width: 100%"><br>';
+    html += '</div>';
+    
+    // Reset Camera Button
+    html += '<button id="resetCamera" style="width: 100%; padding: 8px; background: #4a4aff; color: white; border: none; border-radius: 4px; cursor: pointer; margin-bottom: 15px;">Reset Camera</button>';
+    html += '</div>'; // End of Camera Tab
+    
+    // SCENE TAB
+    html += '<div id="scene-panel" class="debug-panel" style="display: ' + (debugActiveTab === 'scene' ? 'block' : 'none') + ';">';
+    html += '<h3 style="margin: 0 0 10px 0; color: #4a4aff;">Scene Controls</h3>';
+    
+    // Background Color
+    html += '<div style="margin-bottom: 15px;">';
+    html += '<h4 style="margin: 0 0 5px 0; color: #d4e157;">Background</h4>';
+    
+    html += '<label>Background Color: </label>';
+    html += '<input type="color" id="backgroundColorControl" value="#ffffff" style="width: 100%"><br>';
+    
+    html += '<label>Background Opacity: <span id="backgroundOpacity">0</span></label><br>';
+    html += '<input type="range" id="backgroundOpacityControl" min="0" max="1" step="0.05" value="0" style="width: 100%"><br>';
+    html += '</div>';
+    
+    // Fog Controls
+    html += '<div style="margin-bottom: 15px;">';
+    html += '<h4 style="margin: 0 0 5px 0; color: #d4e157;">Fog</h4>';
+    
+    html += '<label><input type="checkbox" id="fogEnabledControl" checked> Enable Fog</label><br><br>';
+    
+    html += '<label>Fog Color: </label>';
+    html += '<input type="color" id="fogColorControl" value="#ffffff" style="width: 100%"><br><br>';
+    
+    html += '<label>Fog Near: <span id="fogNear">15</span></label><br>';
+    html += '<input type="range" id="fogNearControl" min="0" max="50" value="15" style="width: 100%"><br>';
+    
+    html += '<label>Fog Far: <span id="fogFar">80</span></label><br>';
+    html += '<input type="range" id="fogFarControl" min="20" max="200" value="80" style="width: 100%"><br>';
+    html += '</div>';
+    
+    // Back wall
+    html += '<div style="margin-bottom: 15px;">';
+    html += '<h4 style="margin: 0 0 5px 0; color: #d4e157;">Back Wall</h4>';
+    
+    html += '<label>Wall Color: </label>';
+    html += '<input type="color" id="wallColorControl" value="#f0f0f0" style="width: 100%"><br><br>';
+    
+    html += '<label>Wall Distance: <span id="wallDistance">0</span></label><br>';
+    html += '<input type="range" id="wallDistanceControl" min="-20" max="0" step="0.5" value="-5" style="width: 100%"><br>';
+    html += '</div>';
+    
+    // Fragment Controls
+    html += '<div style="margin-bottom: 15px;">';
+    html += '<h4 style="margin: 0 0 5px 0; color: #d4e157;">Fragments</h4>';
+    
+    html += '<label>Fragment Speed: <span id="fragmentSpeedValue">' + fragmentSpeed + '</span></label><br>';
+    html += '<input type="range" id="fragmentSpeedDebugControl" min="0.1" max="2" step="0.05" value="' + fragmentSpeed + '" style="width: 100%"><br>';
+    
+    html += '<label>Explosion Radius: <span id="explosionRadiusValue">4</span></label><br>';
+    html += '<input type="range" id="explosionRadiusControl" min="2" max="10" step="0.5" value="4" style="width: 100%"><br>';
+    html += '</div>';
+    
+    // Shadow Quality
+    html += '<div style="margin-bottom: 15px;">';
+    html += '<h4 style="margin: 0 0 5px 0; color: #d4e157;">Shadow Quality</h4>';
+    
+    html += '<label><input type="checkbox" id="shadowsEnabledControl" checked> Enable Shadows</label><br><br>';
+    
+    html += '<label>Shadow Map Size: </label><br>';
+    html += '<select id="shadowMapSizeControl" style="width: 100%; padding: 5px;">';
+    html += '<option value="512">Low (512)</option>';
+    html += '<option value="1024">Medium (1024)</option>';
+    html += '<option value="2048" selected>High (2048)</option>';
+    html += '<option value="4096">Ultra (4096)</option>';
+    html += '</select><br><br>';
+    
+    html += '<label>Shadow Type: </label><br>';
+    html += '<select id="shadowTypeControl" style="width: 100%; padding: 5px;">';
+    html += '<option value="basic">Basic</option>';
+    html += '<option value="pcf" selected>PCF</option>';
+    html += '<option value="pcfsoft">PCF Soft</option>';
+    html += '<option value="vsm">VSM</option>';
+    html += '</select>';
+    html += '</div>';
+    html += '</div>'; // End of Scene Tab
+    
+    debugPanel.innerHTML = html;
+    document.body.appendChild(debugPanel);
+    
+    // Add event listeners to all the controls and tabs
+    setupDebugControlEvents();
+}
+
+// Setup debug control event listeners
+function setupDebugControlEvents() {
+    // Tab switching
+    document.getElementById('tab-lights').addEventListener('click', () => switchDebugTab('lights'));
+    document.getElementById('tab-sphere').addEventListener('click', () => switchDebugTab('sphere'));
+    document.getElementById('tab-camera').addEventListener('click', () => switchDebugTab('camera'));
+    document.getElementById('tab-scene').addEventListener('click', () => switchDebugTab('scene'));
+    
+    // ---- LIGHTS TAB ----
+    // Main Light controls
+    document.getElementById('mainLightXControl').addEventListener('input', updateLightFromDebugControls);
+    document.getElementById('mainLightYControl').addEventListener('input', updateLightFromDebugControls);
+    document.getElementById('mainLightZControl').addEventListener('input', updateLightFromDebugControls);
+    document.getElementById('mainLightIntensityControl').addEventListener('input', updateLightFromDebugControls);
+    
+    // Spotlight controls
+    document.getElementById('spotLightXControl').addEventListener('input', updateLightFromDebugControls);
+    document.getElementById('spotLightYControl').addEventListener('input', updateLightFromDebugControls);
+    document.getElementById('spotLightZControl').addEventListener('input', updateLightFromDebugControls);
+    document.getElementById('spotLightIntensityControl').addEventListener('input', updateLightFromDebugControls);
+    document.getElementById('spotLightAngleControl').addEventListener('input', updateLightFromDebugControls);
+    document.getElementById('spotLightPenumbraControl').addEventListener('input', updateLightFromDebugControls);
+    
+    // Fill Light 1 controls
+    document.getElementById('fillLight1XControl').addEventListener('input', updateLightFromDebugControls);
+    document.getElementById('fillLight1YControl').addEventListener('input', updateLightFromDebugControls);
+    document.getElementById('fillLight1ZControl').addEventListener('input', updateLightFromDebugControls);
+    document.getElementById('fillLight1IntensityControl').addEventListener('input', updateLightFromDebugControls);
+    
+    // Fill Light 2 controls
+    document.getElementById('fillLight2XControl').addEventListener('input', updateLightFromDebugControls);
+    document.getElementById('fillLight2YControl').addEventListener('input', updateLightFromDebugControls);
+    document.getElementById('fillLight2ZControl').addEventListener('input', updateLightFromDebugControls);
+    document.getElementById('fillLight2IntensityControl').addEventListener('input', updateLightFromDebugControls);
+    
+    // Ambient Light control
+    document.getElementById('ambientLightIntensityControl').addEventListener('input', updateLightFromDebugControls);
+    
+    // Light helper toggle
+    document.getElementById('showLightHelpers').addEventListener('change', toggleLightHelpers);
+    
+    // Export button
+    document.getElementById('exportLightSettings').addEventListener('click', exportLightSettings);
+    
+    // ---- SPHERE TAB ----
+    // Sphere position
+    document.getElementById('sphereXControl').addEventListener('input', updateSphereFromDebugControls);
+    document.getElementById('sphereYControl').addEventListener('input', updateSphereFromDebugControls);
+    document.getElementById('sphereZControl').addEventListener('input', updateSphereFromDebugControls);
+    
+    // Sphere material
+    document.getElementById('sphereColorControl').addEventListener('input', updateSphereFromDebugControls);
+    document.getElementById('sphereShininessControl').addEventListener('input', updateSphereFromDebugControls);
+    document.getElementById('sphereEmissiveIntensityControl').addEventListener('input', updateSphereFromDebugControls);
+    document.getElementById('sphereEmissiveColorControl').addEventListener('input', updateSphereFromDebugControls);
+    
+    // Sphere size & rotation
+    document.getElementById('sphereRadiusControl').addEventListener('input', updateSphereFromDebugControls);
+    document.getElementById('sphereRotationSpeedControl').addEventListener('input', updateSphereFromDebugControls);
+    
+    // Text ring
+    document.getElementById('textRadiusControl').addEventListener('input', updateTextRingFromDebugControls);
+    document.getElementById('textTiltControl').addEventListener('input', updateTextRingFromDebugControls);
+    document.getElementById('textColorControl').addEventListener('input', updateTextRingFromDebugControls);
+    document.getElementById('textEmissiveColorControl').addEventListener('input', updateTextRingFromDebugControls);
+    
+    // ---- CAMERA TAB ----
+    // Camera position
+    document.getElementById('cameraXControl').addEventListener('input', updateCameraFromDebugControls);
+    document.getElementById('cameraYControl').addEventListener('input', updateCameraFromDebugControls);
+    document.getElementById('cameraZControl').addEventListener('input', updateCameraFromDebugControls);
+    
+    // Camera FOV
+    document.getElementById('cameraFOVControl').addEventListener('input', updateCameraFromDebugControls);
+    
+    // Camera look at
+    document.getElementById('cameraTargetXControl').addEventListener('input', updateCameraFromDebugControls);
+    document.getElementById('cameraTargetYControl').addEventListener('input', updateCameraFromDebugControls);
+    document.getElementById('cameraTargetZControl').addEventListener('input', updateCameraFromDebugControls);
+    
+    // Reset camera
+    document.getElementById('resetCamera').addEventListener('click', resetCameraFromDebugControls);
+    
+    // ---- SCENE TAB ----
+    // Background
+    document.getElementById('backgroundColorControl').addEventListener('input', updateSceneFromDebugControls);
+    document.getElementById('backgroundOpacityControl').addEventListener('input', updateSceneFromDebugControls);
+    
+    // Fog
+    document.getElementById('fogEnabledControl').addEventListener('change', updateSceneFromDebugControls);
+    document.getElementById('fogColorControl').addEventListener('input', updateSceneFromDebugControls);
+    document.getElementById('fogNearControl').addEventListener('input', updateSceneFromDebugControls);
+    document.getElementById('fogFarControl').addEventListener('input', updateSceneFromDebugControls);
+    
+    // Back wall
+    document.getElementById('wallColorControl').addEventListener('input', updateSceneFromDebugControls);
+    document.getElementById('wallDistanceControl').addEventListener('input', updateSceneFromDebugControls);
+    
+    // Fragments
+    document.getElementById('fragmentSpeedDebugControl').addEventListener('input', updateSceneFromDebugControls);
+    document.getElementById('explosionRadiusControl').addEventListener('input', updateSceneFromDebugControls);
+    
+    // Shadow quality
+    document.getElementById('shadowsEnabledControl').addEventListener('change', updateSceneFromDebugControls);
+    document.getElementById('shadowMapSizeControl').addEventListener('change', updateSceneFromDebugControls);
+    document.getElementById('shadowTypeControl').addEventListener('change', updateSceneFromDebugControls);
+}
+
+// Update lights based on debug controls
+function updateLightFromDebugControls() {
+    // Main Light
+    const mainLightX = parseFloat(document.getElementById('mainLightXControl').value);
+    const mainLightY = parseFloat(document.getElementById('mainLightYControl').value);
+    const mainLightZ = parseFloat(document.getElementById('mainLightZControl').value);
+    const mainLightIntensity = parseFloat(document.getElementById('mainLightIntensityControl').value);
+    
+    window.mainLight.position.set(mainLightX, mainLightY, mainLightZ);
+    window.mainLight.intensity = mainLightIntensity;
+    
+    document.getElementById('mainLightX').textContent = mainLightX;
+    document.getElementById('mainLightY').textContent = mainLightY;
+    document.getElementById('mainLightZ').textContent = mainLightZ;
+    document.getElementById('mainLightIntensity').textContent = mainLightIntensity;
+    
+    // Spotlight
+    const spotLightX = parseFloat(document.getElementById('spotLightXControl').value);
+    const spotLightY = parseFloat(document.getElementById('spotLightYControl').value);
+    const spotLightZ = parseFloat(document.getElementById('spotLightZControl').value);
+    const spotLightIntensity = parseFloat(document.getElementById('spotLightIntensityControl').value);
+    const spotLightAngle = parseFloat(document.getElementById('spotLightAngleControl').value);
+    const spotLightPenumbra = parseFloat(document.getElementById('spotLightPenumbraControl').value);
+    
+    window.spotLight.position.set(spotLightX, spotLightY, spotLightZ);
+    window.spotLight.intensity = spotLightIntensity;
+    window.spotLight.angle = spotLightAngle;
+    window.spotLight.penumbra = spotLightPenumbra;
+    
+    document.getElementById('spotLightX').textContent = spotLightX;
+    document.getElementById('spotLightY').textContent = spotLightY;
+    document.getElementById('spotLightZ').textContent = spotLightZ;
+    document.getElementById('spotLightIntensity').textContent = spotLightIntensity;
+    document.getElementById('spotLightAngle').textContent = spotLightAngle.toFixed(2);
+    document.getElementById('spotLightPenumbra').textContent = spotLightPenumbra.toFixed(2);
+    
+    // Fill Light 1
+    const fillLight1X = parseFloat(document.getElementById('fillLight1XControl').value);
+    const fillLight1Y = parseFloat(document.getElementById('fillLight1YControl').value);
+    const fillLight1Z = parseFloat(document.getElementById('fillLight1ZControl').value);
+    const fillLight1Intensity = parseFloat(document.getElementById('fillLight1IntensityControl').value);
+    
+    window.fillLight1.position.set(fillLight1X, fillLight1Y, fillLight1Z);
+    window.fillLight1.intensity = fillLight1Intensity;
+    
+    document.getElementById('fillLight1X').textContent = fillLight1X;
+    document.getElementById('fillLight1Y').textContent = fillLight1Y;
+    document.getElementById('fillLight1Z').textContent = fillLight1Z;
+    document.getElementById('fillLight1Intensity').textContent = fillLight1Intensity;
+    
+    // Fill Light 2
+    const fillLight2X = parseFloat(document.getElementById('fillLight2XControl').value);
+    const fillLight2Y = parseFloat(document.getElementById('fillLight2YControl').value);
+    const fillLight2Z = parseFloat(document.getElementById('fillLight2ZControl').value);
+    const fillLight2Intensity = parseFloat(document.getElementById('fillLight2IntensityControl').value);
+    
+    window.fillLight2.position.set(fillLight2X, fillLight2Y, fillLight2Z);
+    window.fillLight2.intensity = fillLight2Intensity;
+    
+    document.getElementById('fillLight2X').textContent = fillLight2X;
+    document.getElementById('fillLight2Y').textContent = fillLight2Y;
+    document.getElementById('fillLight2Z').textContent = fillLight2Z;
+    document.getElementById('fillLight2Intensity').textContent = fillLight2Intensity;
+    
+    // Ambient Light
+    const ambientLightIntensity = parseFloat(document.getElementById('ambientLightIntensityControl').value);
+    window.ambientLight.intensity = ambientLightIntensity;
+    document.getElementById('ambientLightIntensity').textContent = ambientLightIntensity;
+    
+    // Update light helpers if visible
+    updateLightHelpers();
+}
+
+// Update sphere from debug controls
+function updateSphereFromDebugControls() {
+    if (!hexagon) return;
+    
+    // Sphere position
+    const sphereX = parseFloat(document.getElementById('sphereXControl').value);
+    const sphereY = parseFloat(document.getElementById('sphereYControl').value);
+    const sphereZ = parseFloat(document.getElementById('sphereZControl').value);
+    
+    hexagon.position.set(sphereX, sphereY, sphereZ);
+    
+    document.getElementById('sphereX').textContent = sphereX;
+    document.getElementById('sphereY').textContent = sphereY;
+    document.getElementById('sphereZ').textContent = sphereZ;
+    
+    // Sphere material
+    const sphereColor = document.getElementById('sphereColorControl').value;
+    const sphereShininess = parseFloat(document.getElementById('sphereShininessControl').value);
+    const sphereEmissiveIntensity = parseFloat(document.getElementById('sphereEmissiveIntensityControl').value);
+    const sphereEmissiveColor = document.getElementById('sphereEmissiveColorControl').value;
+    
+    hexagon.material.color.set(sphereColor);
+    hexagon.material.shininess = sphereShininess;
+    hexagon.material.emissiveIntensity = sphereEmissiveIntensity;
+    hexagon.material.emissive.set(sphereEmissiveColor);
+    
+    document.getElementById('sphereShininess').textContent = sphereShininess;
+    document.getElementById('sphereEmissiveIntensity').textContent = sphereEmissiveIntensity;
+    
+    // Sphere size & rotation
+    const sphereRadius = parseFloat(document.getElementById('sphereRadiusControl').value);
+    rotationSpeed = parseFloat(document.getElementById('sphereRotationSpeedControl').value);
+    
+    // We need to recreate the geometry since sphere radius can't be directly changed
+    if (Math.abs(hexagon.geometry.parameters.radius - sphereRadius) > 0.01) {
+        const newGeometry = new THREE.SphereGeometry(sphereRadius, 64, 64);
+        hexagon.geometry.dispose();
+        hexagon.geometry = newGeometry;
+    }
+    
+    document.getElementById('sphereRadius').textContent = sphereRadius;
+    document.getElementById('sphereRotationSpeed').textContent = rotationSpeed.toFixed(3);
+}
+
+// Update text ring from debug controls
+function updateTextRingFromDebugControls() {
+    if (!window.textRing) return;
+    
+    const textRing = window.textRing;
+    const textRadius = parseFloat(document.getElementById('textRadiusControl').value);
+    const textTilt = parseFloat(document.getElementById('textTiltControl').value);
+    const textColor = document.getElementById('textColorControl').value;
+    const textEmissiveColor = document.getElementById('textEmissiveColorControl').value;
+    
+    // Update text ring tilt
+    textRing.rotation.x = textTilt;
+    
+    document.getElementById('textRadius').textContent = textRadius;
+    document.getElementById('textTilt').textContent = textTilt.toFixed(2);
+    
+    // Update each letter position and material
+    textRing.children.forEach((letter, i) => {
+        const totalLetters = textRing.children.length;
+        const angle = (i / totalLetters) * Math.PI * 2;
+        
+        // Update position based on new radius
+        letter.position.x = textRadius * Math.sin(angle);
+        letter.position.z = textRadius * Math.cos(angle);
+        
+        // Update material
+        letter.material.color.set(textColor);
+        letter.material.emissive.set(textEmissiveColor);
+    });
+}
+
+// Update camera from debug controls
+function updateCameraFromDebugControls() {
+    // Camera position
+    const cameraX = parseFloat(document.getElementById('cameraXControl').value);
+    const cameraY = parseFloat(document.getElementById('cameraYControl').value);
+    const cameraZ = parseFloat(document.getElementById('cameraZControl').value);
+    
+    camera.position.set(cameraX, cameraY, cameraZ);
+    
+    document.getElementById('cameraX').textContent = cameraX;
+    document.getElementById('cameraY').textContent = cameraY;
+    document.getElementById('cameraZ').textContent = cameraZ;
+    
+    // Camera FOV
+    const cameraFOV = parseFloat(document.getElementById('cameraFOVControl').value);
+    camera.fov = cameraFOV;
+    camera.updateProjectionMatrix();
+    
+    document.getElementById('cameraFOV').textContent = cameraFOV;
+    
+    // Camera look at
+    const targetX = parseFloat(document.getElementById('cameraTargetXControl').value);
+    const targetY = parseFloat(document.getElementById('cameraTargetYControl').value);
+    const targetZ = parseFloat(document.getElementById('cameraTargetZControl').value);
+    
+    camera.lookAt(targetX, targetY, targetZ);
+    
+    document.getElementById('cameraTargetX').textContent = targetX;
+    document.getElementById('cameraTargetY').textContent = targetY;
+    document.getElementById('cameraTargetZ').textContent = targetZ;
+}
+
+// Reset camera to original position
+function resetCameraFromDebugControls() {
+    const cameraDistance = 15;
+    camera.position.set(0, 0, cameraDistance);
+    camera.lookAt(0, 0, 0);
+    camera.fov = 75;
+    camera.updateProjectionMatrix();
+    
+    // Update UI controls
+    document.getElementById('cameraXControl').value = 0;
+    document.getElementById('cameraYControl').value = 0;
+    document.getElementById('cameraZControl').value = cameraDistance;
+    document.getElementById('cameraFOVControl').value = 75;
+    document.getElementById('cameraTargetXControl').value = 0;
+    document.getElementById('cameraTargetYControl').value = 0;
+    document.getElementById('cameraTargetZControl').value = 0;
+    
+    // Update labels
+    document.getElementById('cameraX').textContent = 0;
+    document.getElementById('cameraY').textContent = 0;
+    document.getElementById('cameraZ').textContent = cameraDistance;
+    document.getElementById('cameraFOV').textContent = 75;
+    document.getElementById('cameraTargetX').textContent = 0;
+    document.getElementById('cameraTargetY').textContent = 0;
+    document.getElementById('cameraTargetZ').textContent = 0;
+}
+
+// Update scene from debug controls
+function updateSceneFromDebugControls() {
+    // Background
+    const backgroundColor = document.getElementById('backgroundColorControl').value;
+    const backgroundOpacity = parseFloat(document.getElementById('backgroundOpacityControl').value);
+    
+    const bgColor = new THREE.Color(backgroundColor);
+    renderer.setClearColor(bgColor, backgroundOpacity);
+    
+    document.getElementById('backgroundOpacity').textContent = backgroundOpacity.toFixed(2);
+    
+    // Fog
+    const fogEnabled = document.getElementById('fogEnabledControl').checked;
+    const fogColor = document.getElementById('fogColorControl').value;
+    const fogNear = parseFloat(document.getElementById('fogNearControl').value);
+    const fogFar = parseFloat(document.getElementById('fogFarControl').value);
+    
+    if (fogEnabled) {
+        scene.fog = new THREE.Fog(fogColor, fogNear, fogFar);
+    } else {
+        scene.fog = null;
+    }
+    
+    document.getElementById('fogNear').textContent = fogNear;
+    document.getElementById('fogFar').textContent = fogFar;
+    
+    // Back wall
+    const wallColor = document.getElementById('wallColorControl').value;
+    const wallDistance = parseFloat(document.getElementById('wallDistanceControl').value);
+    
+    if (window.displayBox && window.displayBox.children.length > 0) {
+        // The first child should be the back wall
+        const backWall = window.displayBox.children[0];
+        if (backWall) {
+            backWall.material.color.set(wallColor);
+            backWall.position.z = wallDistance;
+        }
+    }
+    
+    document.getElementById('wallDistance').textContent = wallDistance;
+    
+    // Fragments
+    fragmentSpeed = parseFloat(document.getElementById('fragmentSpeedDebugControl').value);
+    const explosionRadius = parseFloat(document.getElementById('explosionRadiusControl').value);
+    
+    document.getElementById('fragmentSpeedValue').textContent = fragmentSpeed.toFixed(2);
+    document.getElementById('explosionRadiusValue').textContent = explosionRadius;
+    
+    // Update any existing fragments with new explosion radius
+    fragments.forEach((fragment, index) => {
+        if (fragment.userData && fragment.userData.targetPosition) {
+            const totalFragments = fragments.length;
+            const angle = (index / totalFragments) * Math.PI * 2;
+            
+            // Update target position with new radius
+            fragment.userData.targetPosition.x = Math.cos(angle) * explosionRadius;
+            fragment.userData.targetPosition.y = Math.sin(angle) * explosionRadius;
+        }
+    });
+    
+    // Shadow quality
+    const shadowsEnabled = document.getElementById('shadowsEnabledControl').checked;
+    const shadowMapSize = parseInt(document.getElementById('shadowMapSizeControl').value);
+    const shadowType = document.getElementById('shadowTypeControl').value;
+    
+    renderer.shadowMap.enabled = shadowsEnabled;
+    
+    if (shadowsEnabled) {
+        // Update shadow map type
+        switch (shadowType) {
+            case 'basic':
+                renderer.shadowMap.type = THREE.BasicShadowMap;
+                break;
+            case 'pcf':
+                renderer.shadowMap.type = THREE.PCFShadowMap;
+                break;
+            case 'pcfsoft':
+                renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+                break;
+            case 'vsm':
+                renderer.shadowMap.type = THREE.VSMShadowMap;
+                break;
+        }
+        
+        // Update shadow map size for all lights
+        [window.mainLight, window.spotLight].forEach(light => {
+            if (light && light.shadow) {
+                light.shadow.mapSize.width = shadowMapSize;
+                light.shadow.mapSize.height = shadowMapSize;
+                light.shadow.map?.dispose(); // Force shadow map to be recreated
+                light.shadow.needsUpdate = true;
+            }
+        });
+    }
+}
+
+// Switch between debug tabs
+function switchDebugTab(tabName) {
+    debugActiveTab = tabName;
+    
+    // Update tab buttons
+    document.querySelectorAll('.debug-tab').forEach(tab => {
+        tab.style.background = '#333';
+    });
+    document.getElementById('tab-' + tabName).style.background = '#4a4aff';
+    
+    // Show/hide panels
+    document.querySelectorAll('.debug-panel').forEach(panel => {
+        panel.style.display = 'none';
+    });
+    document.getElementById(tabName + '-panel').style.display = 'block';
+}
+
+// Toggle light helper visibility
+function toggleLightHelpers() {
+    const showHelpers = document.getElementById('showLightHelpers').checked;
+    
+    // Remove any existing helpers
+    lightDebugHelpers.forEach(helper => {
+        scene.remove(helper);
+    });
+    lightDebugHelpers = [];
+    
+    if (showHelpers) {
+        // Create new helpers
+        const mainLightHelper = new THREE.DirectionalLightHelper(window.mainLight, 5);
+        scene.add(mainLightHelper);
+        lightDebugHelpers.push(mainLightHelper);
+        
+        const spotLightHelper = new THREE.SpotLightHelper(window.spotLight);
+        scene.add(spotLightHelper);
+        lightDebugHelpers.push(spotLightHelper);
+        
+        const fillLight1Helper = new THREE.DirectionalLightHelper(window.fillLight1, 3);
+        scene.add(fillLight1Helper);
+        lightDebugHelpers.push(fillLight1Helper);
+        
+        const fillLight2Helper = new THREE.DirectionalLightHelper(window.fillLight2, 3);
+        scene.add(fillLight2Helper);
+        lightDebugHelpers.push(fillLight2Helper);
+    }
+}
+
+// Update light helpers
+function updateLightHelpers() {
+    if (document.getElementById('showLightHelpers')?.checked) {
+        lightDebugHelpers.forEach(helper => {
+            helper.update();
+        });
+    }
+}
+
+// Export light settings
+function exportLightSettings() {
+    const settings = {
+        mainLight: {
+            position: {
+                x: window.mainLight.position.x,
+                y: window.mainLight.position.y,
+                z: window.mainLight.position.z
+            },
+            intensity: window.mainLight.intensity
+        },
+        spotLight: {
+            position: {
+                x: window.spotLight.position.x,
+                y: window.spotLight.position.y,
+                z: window.spotLight.position.z
+            },
+            intensity: window.spotLight.intensity,
+            angle: window.spotLight.angle,
+            penumbra: window.spotLight.penumbra
+        },
+        fillLight1: {
+            position: {
+                x: window.fillLight1.position.x,
+                y: window.fillLight1.position.y,
+                z: window.fillLight1.position.z
+            },
+            intensity: window.fillLight1.intensity
+        },
+        fillLight2: {
+            position: {
+                x: window.fillLight2.position.x,
+                y: window.fillLight2.position.y,
+                z: window.fillLight2.position.z
+            },
+            intensity: window.fillLight2.intensity
+        },
+        ambientLight: {
+            intensity: window.ambientLight.intensity
+        }
+    };
+    
+    console.log('Light Settings:');
+    console.log(JSON.stringify(settings, null, 2));
+    
+    // Create a text display with the settings
+    const output = document.createElement('textarea');
+    output.value = JSON.stringify(settings, null, 2);
+    output.style.position = 'fixed';
+    output.style.left = '50%';
+    output.style.top = '50%';
+    output.style.transform = 'translate(-50%, -50%)';
+    output.style.width = '500px';
+    output.style.height = '400px';
+    output.style.zIndex = '2000';
+    document.body.appendChild(output);
+    
+    // Select all text for easy copying
+    output.select();
+    
+    // Add close button
+    const closeBtn = document.createElement('button');
+    closeBtn.textContent = 'Close';
+    closeBtn.style.position = 'fixed';
+    closeBtn.style.left = '50%';
+    closeBtn.style.transform = 'translateX(-50%)';
+    closeBtn.style.bottom = 'calc(50% - 220px)';
+    closeBtn.style.zIndex = '2001';
+    closeBtn.style.padding = '8px 16px';
+    closeBtn.onclick = function() {
+        document.body.removeChild(output);
+        document.body.removeChild(closeBtn);
+    };
+    document.body.appendChild(closeBtn);
+}
+
+// Add debug toggle button
+function addDebugToggle() {
+    const toggleBtn = document.createElement('button');
+    toggleBtn.id = 'debugToggle';
+    toggleBtn.textContent = 'Debug';
+    toggleBtn.style.position = 'absolute';
+    toggleBtn.style.bottom = '10px';
+    toggleBtn.style.right = '10px';
+    toggleBtn.style.padding = '8px 16px';
+    toggleBtn.style.background = debugMode ? '#4a4aff' : '#333';
+    toggleBtn.style.color = 'white';
+    toggleBtn.style.border = 'none';
+    toggleBtn.style.borderRadius = '4px';
+    toggleBtn.style.cursor = 'pointer';
+    toggleBtn.style.zIndex = '1000';
+    
+    toggleBtn.addEventListener('click', toggleDebugMode);
+    
+    document.body.appendChild(toggleBtn);
+}
+
+// Toggle debug mode
+function toggleDebugMode() {
+    debugMode = !debugMode;
+    
+    const debugPanel = document.getElementById('debugPanel');
+    if (debugPanel) {
+        debugPanel.style.display = debugMode ? 'block' : 'none';
+    }
+    
+    const toggleBtn = document.getElementById('debugToggle');
+    if (toggleBtn) {
+        toggleBtn.style.background = debugMode ? '#4a4aff' : '#333';
+    }
+    
+    // Clear any light helpers when exiting debug mode
+    if (!debugMode) {
+        lightDebugHelpers.forEach(helper => {
+            scene.remove(helper);
+        });
+        lightDebugHelpers = [];
     }
 }
 
